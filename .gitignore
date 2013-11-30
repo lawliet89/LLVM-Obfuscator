@@ -1,0 +1,7 @@
+Debug+Asserts/
+Makefile.common
+Makefile.llvm.config
+config.log
+config.status
+lib/sample/Debug+Asserts/
+tools/sample/Debug+Asserts/
