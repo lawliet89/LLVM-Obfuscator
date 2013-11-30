@@ -1,7 +1,7 @@
 dnl **************************************************************************
 dnl * Initialize
 dnl **************************************************************************
-AC_INIT([[[SAMPLE]]],[[[x.xx]]],[bugs@yourdomain])
+AC_INIT([[[LLVM-Obfuscator]]],[[[1.00]]],[ywc110@imperial.ac.uk])
 
 dnl Identify where LLVM source tree is
 LLVM_SRC_ROOT="../.."
