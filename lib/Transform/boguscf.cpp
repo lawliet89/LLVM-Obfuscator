@@ -2,6 +2,8 @@
 #include <vector>
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
@@ -90,16 +92,28 @@ struct BogusCF : public FunctionPass {
         }
       }
 
+      block->getTerminator()->eraseFromParent();
+
       // Create Opaque Predicate
       // Always true for now
+      Value *lhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
+      Value *rhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
+      FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
 
+      // Bogus conditional branch
+      BranchInst::Create(originalBlock, copyBlock,(Value *) condition, block);
 
+      hasBeenModified |= true;
       ++i;
     }
 
     // DEBUG(F.viewCFG());
 
     return hasBeenModified;
+  }
+
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    // AU.addRequired<DCE>();
   }
 };
 }
