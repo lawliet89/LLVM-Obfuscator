@@ -1,3 +1,4 @@
+#define DEBUG_TYPE "boguscf"
 #include <algorithm>
 #include <vector>
 #include "llvm/Pass.h"
@@ -13,9 +14,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
-
-#define DEBUG_TYPE "boguscf"
-
 using namespace llvm;
 
 /*
@@ -46,17 +44,21 @@ struct BogusCF : public FunctionPass {
 
     DEBUG_WITH_TYPE("opt", errs() << "\t" << F.size()
                                   << " basic blocks found\n");
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
     for (Function::iterator B = F.begin(), BEnd = F.end(); B != BEnd; ++B) {
       blocks.push_back((BasicBlock *)B);
     }
     Twine blockPrefix = "block_";
     // std::random_shuffle(blocks.begin(), blocks.end());
     unsigned i = 0;
-    for (BasicBlock *block : blocks) {
+    DEBUG_WITH_TYPE("opt", for (BasicBlock * block
+                                : blocks) {
       if (!block->hasName()) {
         block->setName(blockPrefix + Twine(i++));
       }
+    });
+    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+
+    for (BasicBlock *block : blocks) {
       DEBUG_WITH_TYPE("opt", errs() << "\tBlock " << block->getName() << "\n");
       DEBUG_WITH_TYPE("opt", errs() << "\t\tSplitting Basic Block\n");
       BasicBlock::iterator inst1 = block->begin();
@@ -83,12 +85,13 @@ struct BogusCF : public FunctionPass {
       }
 
       BasicBlock *originalBlock = block->splitBasicBlock(inst1);
-      originalBlock->setName(block->getName() + "_original");
+      DEBUG_WITH_TYPE("opt",
+                      originalBlock->setName(block->getName() + "_original"));
       DEBUG_WITH_TYPE("opt", errs() << "\t\tCloning Basic Block\n");
       Twine prefix = "Cloned";
       ValueToValueMapTy VMap;
       BasicBlock *copyBlock = CloneBasicBlock(originalBlock, VMap, prefix, &F);
-      copyBlock->setName(block->getName() + "_cloned");
+      DEBUG_WITH_TYPE("opt", copyBlock->setName(block->getName() + "_cloned"));
 
       // Remap operands, phi nodes, and metadata
       DEBUG_WITH_TYPE("opt", errs() << "\t\tRemapping information\n");
