@@ -50,11 +50,14 @@ struct BogusCF : public FunctionPass {
     for (Function::iterator B = F.begin(), BEnd = F.end(); B != BEnd; ++B) {
       blocks.push_back((BasicBlock *)B);
     }
-
+    Twine blockPrefix = "block_";
     // std::random_shuffle(blocks.begin(), blocks.end());
     unsigned i = 0;
     for (BasicBlock *block : blocks) {
-      DEBUG_WITH_TYPE("opt", errs() << "\tBlock " << i << "\n");
+      if (!block->hasName()) {
+        block->setName(blockPrefix + Twine(i++));
+      }
+      DEBUG_WITH_TYPE("opt", errs() << "\tBlock " << block->getName() << "\n");
       DEBUG_WITH_TYPE("opt", errs() << "\t\tSplitting Basic Block\n");
       BasicBlock::iterator inst1 = block->begin();
       if (block->getFirstNonPHIOrDbgOrLifetime()) {
@@ -80,10 +83,12 @@ struct BogusCF : public FunctionPass {
       }
 
       BasicBlock *originalBlock = block->splitBasicBlock(inst1);
+      originalBlock->setName(block->getName() + "_original");
       DEBUG_WITH_TYPE("opt", errs() << "\t\tCloning Basic Block\n");
-      Twine prefix = "cloned";
+      Twine prefix = "Cloned";
       ValueToValueMapTy VMap;
       BasicBlock *copyBlock = CloneBasicBlock(originalBlock, VMap, prefix, &F);
+      copyBlock->setName(block->getName() + "_cloned");
 
       // Remap operands, phi nodes, and metadata
       DEBUG_WITH_TYPE("opt", errs() << "\t\tRemapping information\n");
@@ -141,7 +146,6 @@ struct BogusCF : public FunctionPass {
       // Handle phi nodes in successor block
 
       hasBeenModified |= true;
-      ++i;
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
     return hasBeenModified;
