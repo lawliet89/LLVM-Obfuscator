@@ -9,6 +9,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/User.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
@@ -86,14 +87,39 @@ struct BogusCF : public FunctionPass {
 
       // Remap operands, phi nodes, and metadata
       DEBUG_WITH_TYPE("opt", errs() << "\t\tRemapping information\n");
-      for (auto &inst : *copyBlock) {
-        for (auto op = inst.op_begin(), E = inst.op_end(); op != E; ++op) {
-          errs() << "\t\t\tOperand " << op->get()->getName() << "\n";
-        }
 
+      for (auto &inst : *copyBlock) {
         RemapInstruction(&inst, VMap, RF_IgnoreMissingEntries);
       }
 
+      for (auto &inst : *originalBlock) {
+        // The instruction object itself is the Value for the result
+        errs() << "\t\t\t" << inst << ": ";
+        bool usedLater = false;
+        for (auto use = inst.use_begin(), useEnd = inst.use_end();
+             use != useEnd; ++use) {
+          if (Instruction *userInst = dyn_cast<Instruction>(*use)) {
+            BasicBlock *userBlock = userInst->getParent();
+            if (userBlock != copyBlock && userBlock != originalBlock){
+              usedLater = true;
+              errs() << "Used Later";
+            }
+            if (PHINode *phi = dyn_cast<PHINode>(userInst)) {
+              errs() << " PHINode";
+              // Update PHINode
+              // TODO: Handle if it wasn't
+              phi->addIncoming(VMap[&inst], copyBlock);
+            }
+
+          }
+        }
+        if (!usedLater) {
+          errs() << "NOT used later";
+        }
+        errs() << "\n";
+      }
+
+      // Clear the unconditional branch from the "husk" original block
       block->getTerminator()->eraseFromParent();
 
       // Create Opaque Predicate
@@ -109,10 +135,8 @@ struct BogusCF : public FunctionPass {
 
       hasBeenModified |= true;
       ++i;
-
-      // DEBUG(F.viewCFG());
     }
-
+    DEBUG_WITH_TYPE("cfg", F.viewCFG());
     return hasBeenModified;
   }
 
