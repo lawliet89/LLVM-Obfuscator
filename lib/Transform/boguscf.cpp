@@ -1,7 +1,10 @@
 #include <algorithm>
 #include <vector>
 #include "llvm/Pass.h"
+#include "llvm/IR/Value.h"
+#include "llvm/Analysis/Dominators.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -42,6 +45,7 @@ struct BogusCF : public FunctionPass {
 
     DEBUG_WITH_TYPE("opt", errs() << "\t" << F.size()
                                   << " basic blocks found\n");
+    // DEBUG(F.viewCFG());
     for (Function::iterator B = F.begin(), BEnd = F.end(); B != BEnd; ++B) {
       blocks.push_back((BasicBlock *)B);
     }
@@ -55,8 +59,26 @@ struct BogusCF : public FunctionPass {
       if (block->getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block->getFirstNonPHIOrDbgOrLifetime();
       }
-      BasicBlock *originalBlock = block->splitBasicBlock(inst1);
 
+      // We do not want to split a basic block that is only involved with some
+      // terminator instruction
+      if (isa<TerminatorInst>(inst1))
+        continue;
+
+      auto terminator = block->getTerminator();
+
+      if (!isa<ReturnInst>(terminator) && terminator->getNumSuccessors() > 1) {
+        DEBUG_WITH_TYPE("opt", errs() << "\t\tSkipping: >1 successor\n");
+        continue;
+      }
+
+      // 1 Successor or return block
+      BasicBlock *successor;
+      if (!isa<ReturnInst>(terminator)) {
+        successor = *succ_begin(block);
+      }
+
+      BasicBlock *originalBlock = block->splitBasicBlock(inst1);
       DEBUG_WITH_TYPE("opt", errs() << "\t\tCloning Basic Block\n");
       Twine prefix = "cloned";
       ValueToValueMapTy VMap;
@@ -65,31 +87,11 @@ struct BogusCF : public FunctionPass {
       // Remap operands, phi nodes, and metadata
       DEBUG_WITH_TYPE("opt", errs() << "\t\tRemapping information\n");
       for (auto &inst : *copyBlock) {
-        // Operands
-        for (auto operand = inst.op_begin(), operandEnd = inst.op_end();
-             operand != operandEnd; ++operand) {
-          Value *v = MapValue(*operand, VMap);
-          if (v)
-            *operand = v;
-        }
-        // Phi nodes
-        if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
-          for (unsigned i = 0, e = phi->getNumIncomingValues(); i != e; ++i) {
-            Value *v = MapValue(phi->getIncomingBlock(i), VMap);
-            if (v)
-              phi->setIncomingBlock(i, cast<BasicBlock>(v));
-          }
+        for (auto op = inst.op_begin(), E = inst.op_end(); op != E; ++op) {
+          errs() << "\t\t\tOperand " << op->get()->getName() << "\n";
         }
 
-        // Metadata
-        SmallVector<std::pair<unsigned, MDNode *>, 4> metas;
-        inst.getAllMetadata(metas);
-        for (auto &meta : metas) {
-          MDNode *oldMeta = meta.second;
-          MDNode *newMeta = MapValue(oldMeta, VMap);
-          if (oldMeta != newMeta)
-            inst.setMetadata(meta.first, newMeta);
-        }
+        RemapInstruction(&inst, VMap, RF_IgnoreMissingEntries);
       }
 
       block->getTerminator()->eraseFromParent();
@@ -101,24 +103,25 @@ struct BogusCF : public FunctionPass {
       FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
 
       // Bogus conditional branch
-      BranchInst::Create(originalBlock, copyBlock,(Value *) condition, block);
+      BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
+
+      // Handle phi nodes in successor block
 
       hasBeenModified |= true;
       ++i;
-    }
 
-    // DEBUG(F.viewCFG());
+      // DEBUG(F.viewCFG());
+    }
 
     return hasBeenModified;
   }
 
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    // AU.addRequired<DCE>();
+  virtual void getAnalysisUsage(AnalysisUsage &Info) const {
+    Info.addRequired<DominatorTree>();
   }
 };
 }
 
 char BogusCF::ID = 0;
-static RegisterPass<BogusCF> X("boguscf", "Insert bogus control flow paths \
-into basic blocks",
-                               false, false);
+static RegisterPass<BogusCF>
+X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
