@@ -107,11 +107,12 @@ struct BogusCF : public FunctionPass {
         for (auto &inst : *originalBlock) {
           DEBUG_WITH_TYPE("opt", errs() << "\t\t\t" << inst << "\n");
           PHINode *phi = nullptr;
+          std::vector<User *> users;
           // The instruction object itself is the Value for the result
-          for (auto use = inst.use_begin(), useEnd = inst.use_end();
-               use != useEnd; ++use) {
+          for (auto user = inst.use_begin(), useEnd = inst.use_end();
+               user != useEnd; ++user) {
             // User is an instruction
-            if (Instruction *userInst = dyn_cast<Instruction>(*use)) {
+            if (Instruction *userInst = dyn_cast<Instruction>(*user)) {
               BasicBlock *userBlock = userInst->getParent();
               // Instruction belongs to another block that is not us
               if (userBlock != copyBlock && userBlock != originalBlock) {
@@ -123,6 +124,11 @@ struct BogusCF : public FunctionPass {
                   phiCheck->addIncoming(VMap[&inst], copyBlock);
                   break; // done with this instruction
                 } else {
+                  // This is an artificially created PHINode whose value will
+                  // always come from the "upper" blocks as originally
+                  // Might only happen in a loop
+                  // cf
+                  // http://llvm.org/docs/doxygen/html/classllvm_1_1LoopInfo.html
                   DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\t\tNone-PHI Node\n");
                   if (!phi) {
                     DEBUG_WITH_TYPE(
@@ -132,14 +138,31 @@ struct BogusCF : public FunctionPass {
                         inst.getType(), 2, "",
                         successor->getFirstNonPHIOrDbgOrLifetime());
                     phi->addIncoming(&inst, originalBlock);
+                    phi->addIncoming(VMap[&inst], copyBlock);
                   }
-                  phi->addIncoming(VMap[&inst], userBlock);
+                  users.push_back(*user);
                 }
               }
             }
           }
+          // If we have artificially created a PHINode
           if (phi) {
-            inst.replaceAllUsesWith(phi);
+            // Update users
+            for (User *user : users) {
+              user->replaceUsesOfWith(&inst, phi);
+            }
+            // Add incoming phi nodes for all the successor's predecessors
+            // to point to itself
+            // This is because the Value was used not in a PHINode but from
+            // our own created one, then the Value must have only been produced
+            // in the block that we just split. And thus not going to be changed
+            for (auto pred = pred_begin(successor),
+                      predEnd = pred_end(successor);
+                 pred != predEnd; ++pred) {
+              if (*pred != originalBlock && *pred != copyBlock) {
+                phi->addIncoming(phi, *pred);
+              }
+            }
           }
         }
 
@@ -179,8 +202,7 @@ struct BogusCF : public FunctionPass {
       // Bogus conditional branch
       BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
 
-      // Handle phi nodes in successor block
-
+      // DEBUG_WITH_TYPE("cfg", F.viewCFG());
       hasBeenModified |= true;
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
