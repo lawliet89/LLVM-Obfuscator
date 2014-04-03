@@ -11,6 +11,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/User.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
@@ -23,6 +24,12 @@ using namespace llvm;
                 - External opaque predicate or generation or more extensive
    generation
 */
+
+static cl::opt<std::string>
+bcfFunc("bcfFunc", cl::init(""),
+        cl::desc("Insert Bogus Control Flow only for some functions: "
+                 "bcfFunc=\"func1,func2\""));
+
 namespace {
 struct BogusCF : public FunctionPass {
   static char ID;
@@ -36,6 +43,13 @@ struct BogusCF : public FunctionPass {
       return false;
     }
     DEBUG_WITH_TYPE("opt", errs() << "bcf: Function '" << F.getName() << "'\n");
+
+    if ((bcfFunc.size() != 0 &&
+         bcfFunc.find(F.getName()) == std::string::npos)) {
+      DEBUG_WITH_TYPE("opt",
+                      errs() << "\tFunction not requested -- skipping\n");
+      return false;
+    }
 
     // Use a vector to store the list of blocks for probabilistic
     // splitting into two bogus control flow for a later time
