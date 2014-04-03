@@ -118,9 +118,9 @@ struct BogusCF : public FunctionPass {
                 DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\tUsed in "
                                               << userBlock->getName() << "\n");
                 // Check if inst is a phinode
-                if ((phi = dyn_cast<PHINode>(userInst))) {
+                if (PHINode *phiCheck = dyn_cast<PHINode>(userInst)) {
                   DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\t\tPHI Node\n");
-                  phi->addIncoming(VMap[&inst], copyBlock);
+                  phiCheck->addIncoming(VMap[&inst], copyBlock);
                   break; // done with this instruction
                 } else {
                   DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\t\tNone-PHI Node\n");
@@ -133,11 +133,13 @@ struct BogusCF : public FunctionPass {
                         successor->getFirstNonPHIOrDbgOrLifetime());
                     phi->addIncoming(&inst, originalBlock);
                   }
-                  phi->addIncoming(VMap[&inst], copyBlock);
-                  use->replaceUsesOfWith(*use, phi);
+                  phi->addIncoming(VMap[&inst], userBlock);
                 }
               }
             }
+          }
+          if (phi) {
+            inst.replaceAllUsesWith(phi);
           }
         }
 
@@ -158,7 +160,7 @@ struct BogusCF : public FunctionPass {
                 phiClonedBlock = true;
               }
             }
-            if (!phiClonedBlock && phiOriginalBlock) {
+            if (!phiClonedBlock && phiOriginalBlock && originalValue) {
               phi->addIncoming(originalValue, copyBlock);
             }
           }
