@@ -74,7 +74,6 @@ struct BogusCF : public FunctionPass {
 
     for (BasicBlock *block : blocks) {
       DEBUG_WITH_TYPE("opt", errs() << "\tBlock " << block->getName() << "\n");
-      DEBUG_WITH_TYPE("opt", errs() << "\t\tSplitting Basic Block\n");
       BasicBlock::iterator inst1 = block->begin();
       if (block->getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block->getFirstNonPHIOrDbgOrLifetime();
@@ -82,8 +81,11 @@ struct BogusCF : public FunctionPass {
 
       // We do not want to split a basic block that is only involved with some
       // terminator instruction
-      if (isa<TerminatorInst>(inst1))
+      if (isa<TerminatorInst>(inst1)) {
+        DEBUG_WITH_TYPE("opt",
+                        errs() << "\t\tSkipping: PHI and Terminator only\n");
         continue;
+      }
 
       auto terminator = block->getTerminator();
 
@@ -98,6 +100,7 @@ struct BogusCF : public FunctionPass {
         successor = *succ_begin(block);
       }
 
+      DEBUG_WITH_TYPE("opt", errs() << "\t\tSplitting Basic Block\n");
       BasicBlock *originalBlock = block->splitBasicBlock(inst1);
       DEBUG_WITH_TYPE("opt",
                       originalBlock->setName(block->getName() + "_original"));
@@ -132,10 +135,14 @@ struct BogusCF : public FunctionPass {
               if (userBlock != copyBlock && userBlock != originalBlock) {
                 DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\tUsed in "
                                               << userBlock->getName() << "\n");
-                // Check if inst is a phinode
-                if (PHINode *phiCheck = dyn_cast<PHINode>(userInst)) {
+                // Check if inst is a phinode in successor
+                // If it's not in a successor, it's the same as the else case
+                PHINode *phiCheck = dyn_cast<PHINode>(userInst);
+                if (phiCheck && phiCheck->getParent() == successor) {
                   DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\t\tPHI Node\n");
-                  phiCheck->addIncoming(VMap[&inst], copyBlock);
+                  if (phiCheck->getBasicBlockIndex(originalBlock) != -1) {
+                    phiCheck->addIncoming(VMap[&inst], copyBlock);
+                  }
                   break; // done with this instruction
                 } else {
                   // This is an artificially created PHINode whose value will
@@ -146,7 +153,7 @@ struct BogusCF : public FunctionPass {
                   DEBUG_WITH_TYPE("opt", errs() << "\t\t\t\t\tNone-PHI Node\n");
                   if (!phi) {
                     DEBUG_WITH_TYPE(
-                        "opt", errs() << "\t\t\t\t\t\t\tCreating PHI Node\n");
+                        "opt", errs() << "\t\t\t\t\t\tCreating PHI Node\n");
                     // If still not, then we will create in successor
                     phi = PHINode::Create(
                         inst.getType(), 2, "",
