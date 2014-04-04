@@ -69,7 +69,7 @@ struct BogusCF : public FunctionPass {
                    block->setName(blockPrefix + Twine(i++));
                  }
                });
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+    DEBUG(F.viewCFG());
 
     for (BasicBlock *block : blocks) {
       DEBUG(errs() << "\tBlock " << block->getName() << "\n");
@@ -86,15 +86,16 @@ struct BogusCF : public FunctionPass {
       }
 
       auto terminator = block->getTerminator();
+      bool hasSuccessors = terminator->getNumSuccessors() > 0;
 
-      if (!isa<ReturnInst>(terminator) && terminator->getNumSuccessors() > 1) {
+      if (hasSuccessors && terminator->getNumSuccessors() > 1) {
         DEBUG(errs() << "\t\tSkipping: >1 successor\n");
         continue;
       }
 
-      // 1 Successor or return block
+      // ReturnInst and UnreachableInst have no successors
       BasicBlock *successor = nullptr;
-      if (!isa<ReturnInst>(terminator)) {
+      if (hasSuccessors) {
         successor = *succ_begin(block);
       }
 
@@ -220,10 +221,10 @@ struct BogusCF : public FunctionPass {
       // Bogus conditional branch
       BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
 
-      // DEBUG_WITH_TYPE("cfg", F.viewCFG());
+      // DEBUG(F.viewCFG());
       hasBeenModified |= true;
     }
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+    DEBUG(F.viewCFG());
     return hasBeenModified;
   }
 
