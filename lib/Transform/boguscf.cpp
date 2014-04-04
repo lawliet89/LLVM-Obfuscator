@@ -85,6 +85,11 @@ struct BogusCF : public FunctionPass {
         continue;
       }
 
+      if (block->isLandingPad()) {
+        DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
+        continue;
+      }
+
       auto terminator = block->getTerminator();
       bool hasSuccessors = terminator->getNumSuccessors() > 0;
 
