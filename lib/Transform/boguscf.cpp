@@ -2,11 +2,13 @@
 #include <algorithm>
 #include <vector>
 #include "llvm/Pass.h"
+#include "llvm/PassManager.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Analysis/Dominators.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -239,3 +241,10 @@ struct BogusCF : public FunctionPass {
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
 X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
+
+// http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
+static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
+                                [](const PassManagerBuilder &,
+                                   PassManagerBase &PM) {
+  PM.add(new BogusCF());
+});
