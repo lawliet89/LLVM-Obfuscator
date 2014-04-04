@@ -4,7 +4,6 @@
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/IR/Value.h"
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/Scalar.h"
@@ -233,7 +232,6 @@ struct BogusCF : public FunctionPass {
   }
 
   virtual void getAnalysisUsage(AnalysisUsage &Info) const {
-    Info.addRequired<DominatorTree>();
   }
 };
 }
