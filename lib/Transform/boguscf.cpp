@@ -98,7 +98,6 @@ struct BogusCF : public FunctionPass {
         continue;
       }
 
-      // ReturnInst and UnreachableInst have no successors
       BasicBlock *successor = nullptr;
       if (hasSuccessors) {
         successor = *succ_begin(block);
