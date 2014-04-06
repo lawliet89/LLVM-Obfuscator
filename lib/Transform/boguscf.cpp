@@ -27,6 +27,7 @@
 #define DEBUG_TYPE "boguscf"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -60,6 +61,12 @@ bcfProbability("bcfProbability", cl::init(0.5),
 static cl::opt<std::string>
 bcfSeed("bcfSeed", cl::init(""),
         cl::desc("Seed for random number generator. Defaults to system time"));
+
+STATISTIC(NumBlocksSeen, "Number of basic blocks processed (excluding skips "
+                         "due to PHI/terminator only blocks)");
+STATISTIC(NumBlocksSkipped,
+          "Number of blocks skipped due to PHI/terminator only blocks");
+STATISTIC(NumBlocksTransformed, "Number of basic blocks transformed");
 
 namespace {
 struct BogusCF : public FunctionPass {
@@ -119,8 +126,7 @@ struct BogusCF : public FunctionPass {
     DEBUG(errs() << "\tListing and filtering blocks\n");
     // Get original list of blocks
     for (auto &block : F) {
-      DEBUG(
-          if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
+      DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
 
       DEBUG(errs() << "\tBlock " << block.getName() << "\n");
       BasicBlock::iterator inst1 = block.begin();
@@ -131,15 +137,19 @@ struct BogusCF : public FunctionPass {
       // terminator instruction or is a landing pad for an exception
       if (isa<TerminatorInst>(inst1)) {
         DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
+        ++NumBlocksSkipped;
         continue;
       }
       if (block.isLandingPad()) {
         DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
+        ++NumBlocksSkipped;
         continue;
       }
       DEBUG(errs() << "\t\tAdding block\n");
       blocks.push_back(&block);
     }
+
+    NumBlocksSeen += blocks.size();
     DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
@@ -160,6 +170,7 @@ struct BogusCF : public FunctionPass {
         continue;
       }
 
+      ++NumBlocksTransformed;
       auto terminator = block->getTerminator();
       bool hasSuccessors = terminator->getNumSuccessors() > 0;
 
