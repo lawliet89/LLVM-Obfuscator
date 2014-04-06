@@ -114,21 +114,36 @@ struct BogusCF : public FunctionPass {
     blocks.reserve(F.size());
 
     DEBUG(errs() << "\t" << F.size() << " basic blocks found\n");
-    for (Function::iterator B = F.begin(), BEnd = F.end(); B != BEnd; ++B) {
-      blocks.push_back((BasicBlock *)B);
-    }
-
     Twine blockPrefix = "block_";
-
     unsigned i = 0;
-    DEBUG(for (BasicBlock * block
-               : blocks) {
-                 if (!block->hasName()) {
-                   block->setName(blockPrefix + Twine(i++));
-                 }
-               });
+    DEBUG(errs() << "\tListing and filtering blocks\n");
+    // Get original list of blocks
+    for (auto &block : F) {
+      DEBUG(
+          if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
+
+      DEBUG(errs() << "\tBlock " << block.getName() << "\n");
+      BasicBlock::iterator inst1 = block.begin();
+      if (block.getFirstNonPHIOrDbgOrLifetime()) {
+        inst1 = block.getFirstNonPHIOrDbgOrLifetime();
+      }
+      // We do not want to transform a basic block that is only involved with
+      // terminator instruction or is a landing pad for an exception
+      if (isa<TerminatorInst>(inst1)) {
+        DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
+        continue;
+      }
+      if (block.isLandingPad()) {
+        DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
+        continue;
+      }
+      DEBUG(errs() << "\t\tAdding block\n");
+      blocks.push_back(&block);
+    }
+    DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
+    trial.reset(); // Independent per function
     DEBUG(errs() << "\tRandomly shuffling list of basic blocks\n");
     std::random_shuffle(blocks.begin(), blocks.end());
 
@@ -137,18 +152,6 @@ struct BogusCF : public FunctionPass {
       BasicBlock::iterator inst1 = block->begin();
       if (block->getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block->getFirstNonPHIOrDbgOrLifetime();
-      }
-
-      // We do not want to split a basic block that is only involved with some
-      // terminator instruction
-      if (isa<TerminatorInst>(inst1)) {
-        DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
-        continue;
-      }
-
-      if (block->isLandingPad()) {
-        DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
-        continue;
       }
 
       // Now let's decide if we want to transform this block or not
