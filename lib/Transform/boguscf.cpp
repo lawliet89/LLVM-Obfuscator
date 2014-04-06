@@ -1,8 +1,33 @@
+//=== boguscf.cpp - Bogus Control Flow Obfuscation Pass -------------------===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+// Bogus Control Flow adds by probabilistically splitting each basic block into
+// two blocks and then applying an opaque predicate to see if the block ever
+// gets branched to or not.
+//
+// Each basic block is probabilistically split using a Bernoulli distribution
+// subject to a maximum number of basic blocks being transformed per function
+//
+// TODO: Opaque predicate generation
+// Command line options
+// - bcfFunc - List of functions to apply transformation to. Default is all
+// - bfcProbability - Probability that basic block is transformed. Default 0.5
+// - bcfSeed - Seed for random number generator. Defaults to system time
+//
+// Debug types:
+// - boguscf - Bogus CF related
+// - cfg - View CFG of functions before and after transformation
+// TODO Stats
+
 #define DEBUG_TYPE "boguscf"
-#include <algorithm>
-#include <vector>
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
@@ -16,25 +41,56 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
-using namespace llvm;
+#include <algorithm>
+#include <vector>
+#include <chrono>
+#include <random>
 
-/*
-        TODO:
-                - Probabilistic insertion
-                - More than two bogus flow based
-                - External opaque predicate or generation or more extensive
-   generation
-*/
+using namespace llvm;
 
 static cl::list<std::string>
 bcfFunc("bcfFunc", cl::CommaSeparated,
         cl::desc("Insert Bogus Control Flow only for some functions: "
                  "bcfFunc=\"func1,func2\""));
 
+static cl::opt<double>
+bcfProbability("bcfProbability", cl::init(0.5),
+               cl::desc("Probability that a basic block will be split"));
+
+static cl::opt<std::string>
+bcfSeed("bcfSeed", cl::init(""),
+        cl::desc("Seed for random number generator. Defaults to system time"));
+
 namespace {
 struct BogusCF : public FunctionPass {
   static char ID;
+  std::minstd_rand engine;
+  std::bernoulli_distribution trial;
+
   BogusCF() : FunctionPass(ID) {}
+
+  // Initialise and check options
+  virtual bool doInitialization(Module &M) {
+    if (bcfProbability < 0.f || bcfProbability > 1.f) {
+      LLVMContext &ctx = getGlobalContext();
+      ctx.emitError("BogusCF: Probability must be between 0 and 1");
+    }
+
+    // Seed engine and create distribution
+    if (!bcfSeed.empty()) {
+      std::seed_seq seed(bcfSeed.begin(), bcfSeed.end());
+      engine.seed(seed);
+    } else {
+      unsigned seed =
+          std::chrono::system_clock::now().time_since_epoch().count();
+      engine.seed(seed);
+    }
+
+    trial.param(
+        std::bernoulli_distribution::param_type((double)bcfProbability));
+
+    return false;
+  }
 
   virtual bool runOnFunction(Function &F) {
     bool hasBeenModified = false;
@@ -61,8 +117,9 @@ struct BogusCF : public FunctionPass {
     for (Function::iterator B = F.begin(), BEnd = F.end(); B != BEnd; ++B) {
       blocks.push_back((BasicBlock *)B);
     }
+
     Twine blockPrefix = "block_";
-    // std::random_shuffle(blocks.begin(), blocks.end());
+
     unsigned i = 0;
     DEBUG(for (BasicBlock * block
                : blocks) {
@@ -70,7 +127,10 @@ struct BogusCF : public FunctionPass {
                    block->setName(blockPrefix + Twine(i++));
                  }
                });
-    DEBUG(F.viewCFG());
+    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+
+    DEBUG(errs() << "\tRandomly shuffling list of basic blocks\n");
+    std::random_shuffle(blocks.begin(), blocks.end());
 
     for (BasicBlock *block : blocks) {
       DEBUG(errs() << "\tBlock " << block->getName() << "\n");
@@ -88,6 +148,12 @@ struct BogusCF : public FunctionPass {
 
       if (block->isLandingPad()) {
         DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
+        continue;
+      }
+
+      // Now let's decide if we want to transform this block or not
+      if (!trial(engine)) {
+        DEBUG(errs() << "\t\tSkipping: Bernoulli trial failed\n");
         continue;
       }
 
@@ -181,8 +247,10 @@ struct BogusCF : public FunctionPass {
             // Add incoming phi nodes for all the successor's predecessors
             // to point to itself
             // This is because the Value was used not in a PHINode but from
-            // our own created one, then the Value must have only been produced
-            // in the block that we just split. And thus not going to be changed
+            // our own created one, then the Value must have only been
+            // produced
+            // in the block that we just split. And thus not going to be
+            // changed
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
@@ -229,10 +297,10 @@ struct BogusCF : public FunctionPass {
       // Bogus conditional branch
       BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
 
-      // DEBUG(F.viewCFG());
+      // DEBUG_WITH_TYPE("cfg", F.viewCFG());
       hasBeenModified |= true;
     }
-    DEBUG(F.viewCFG());
+    DEBUG_WITH_TYPE("cfg", F.viewCFG());
     return hasBeenModified;
   }
 
