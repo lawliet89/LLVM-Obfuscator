@@ -26,8 +26,8 @@ using namespace llvm;
    generation
 */
 
-static cl::opt<std::string>
-bcfFunc("bcfFunc", cl::init(""),
+static cl::list<std::string>
+bcfFunc("bcfFunc", cl::CommaSeparated,
         cl::desc("Insert Bogus Control Flow only for some functions: "
                  "bcfFunc=\"func1,func2\""));
 
@@ -45,8 +45,9 @@ struct BogusCF : public FunctionPass {
     }
     DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
 
-    if ((bcfFunc.size() != 0 &&
-         bcfFunc.find(F.getName()) == std::string::npos)) {
+    auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
+    if (bcfFunc.size() != 0 &&
+        std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
       DEBUG(errs() << "\tFunction not requested -- skipping\n");
       return false;
     }
