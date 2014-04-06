@@ -93,13 +93,16 @@ struct BogusCF : public FunctionPass {
       auto terminator = block->getTerminator();
       bool hasSuccessors = terminator->getNumSuccessors() > 0;
 
-      if (hasSuccessors && terminator->getNumSuccessors() > 1) {
-        DEBUG(errs() << "\t\tSkipping: >1 successor\n");
-        continue;
-      }
-
       BasicBlock *successor = nullptr;
-      if (hasSuccessors) {
+      // If this block has > 1 successors, we need to create a "successor"
+      // block to be the joiner block that contains the necessary PHI nodes
+      // Will be handled as per normal later on
+      if (hasSuccessors && terminator->getNumSuccessors() > 1) {
+        DEBUG(errs() << "\t\t>1 successor: Creating successor block\n");
+        successor = block->splitBasicBlock(terminator);
+        DEBUG(successor->setName(block->getName() + "_successor"));
+
+      } else if (hasSuccessors) {
         successor = *succ_begin(block);
       }
 
