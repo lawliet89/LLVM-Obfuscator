@@ -20,11 +20,12 @@
 using namespace llvm;
 
 namespace OpaquePredicate {
-
-typedef std::function<int()> Randomner;
 enum PredicateType {
   PredicateFalse = 0x0, PredicateTrue = 0x1, PredicateIndeterminate = 0x2
 };
+
+typedef std::function<int()> Randomner;
+typedef std::function<PredicateType()> PredicateTypeRandomner;
 
 // Prepare module for opaque predicates by adding global variables to the module
 // Returns a vector of pointers to the global variables generated
@@ -37,7 +38,10 @@ std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number = 4);
 // Returns the type of predicate produced
 PredicateType create(BasicBlock *headBlock,
                      BasicBlock *trueBlock,
-                     BasicBlock *falseBlock);
+                     BasicBlock *falseBlock,
+                     const std::vector<GlobalVariable *> &globals,
+                     Randomner randomner,
+                     PredicateTypeRandomner typeRand);
 
 // Given a BasicBlock with an unconditional terminator, and two successor blocks
 // Generate an always true opaque predicate to replace the terminator
@@ -45,7 +49,9 @@ PredicateType create(BasicBlock *headBlock,
 // Returns the type of predicate produced
 void createTrue(BasicBlock *headBlock,
                 BasicBlock *trueBlock,
-                BasicBlock *falseBlock);
+                BasicBlock *falseBlock,
+                const std::vector<GlobalVariable *> &globals,
+                Randomner randomner);
 
 // Given a BasicBlock with an unconditional terminator, and two successor blocks
 // Generate an always false opaque predicate to replace the terminator
@@ -53,7 +59,9 @@ void createTrue(BasicBlock *headBlock,
 // Returns the type of predicate produced
 void createFalse(BasicBlock *headBlock,
                  BasicBlock *trueBlock,
-                 BasicBlock *falseBlock);
+                 BasicBlock *falseBlock,
+                 const std::vector<GlobalVariable *> &globals,
+                 Randomner randomner);
 };
 
 #endif // OPAQUE_PREDICATE_H

@@ -301,6 +301,12 @@ struct BogusCF : public FunctionPass {
         }
       }
 
+      std::uniform_int_distribution<int> distribution;
+      OpaquePredicate::createTrue(block, originalBlock, copyBlock, globals,
+        [&]{
+          return distribution(engine);
+        });
+#if 0
       // Clear the unconditional branch from the "husk" original block
       block->getTerminator()->eraseFromParent();
 
@@ -312,8 +318,8 @@ struct BogusCF : public FunctionPass {
 
       // Bogus conditional branch
       BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
-
-      // DEBUG_WITH_TYPE("cfg", F.viewCFG());
+#endif
+      DEBUG_WITH_TYPE("cfg", F.viewCFG());
       hasBeenModified |= true;
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
