@@ -25,6 +25,7 @@
 // TODO Stats
 
 #define DEBUG_TYPE "boguscf"
+#include "Transform/opaque_predicate.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
@@ -73,6 +74,7 @@ struct BogusCF : public FunctionPass {
   static char ID;
   std::minstd_rand engine;
   std::bernoulli_distribution trial;
+  std::vector<GlobalVariable *> globals;
 
   BogusCF() : FunctionPass(ID) {}
 
@@ -95,8 +97,8 @@ struct BogusCF : public FunctionPass {
 
     trial.param(
         std::bernoulli_distribution::param_type((double)bcfProbability));
-
-    return false;
+    globals = OpaquePredicate::prepareModule(M, 4);
+    return true;
   }
 
   virtual bool runOnFunction(Function &F) {
