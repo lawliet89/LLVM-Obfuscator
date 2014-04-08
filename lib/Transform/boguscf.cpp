@@ -78,9 +78,9 @@ struct BogusCF : public FunctionPass {
   static char ID;
   std::minstd_rand engine;
   std::bernoulli_distribution trial;
-  std::vector<GlobalVariable *> globals;
+  StringRef metaKindName;
 
-  BogusCF() : FunctionPass(ID) {}
+  BogusCF() : FunctionPass(ID), metaKindName("opaqueStub") {}
 
   // Initialise and check options
   virtual bool doInitialization(Module &M) {
@@ -101,8 +101,8 @@ struct BogusCF : public FunctionPass {
 
     trial.param(
         std::bernoulli_distribution::param_type((double)bcfProbability));
-    globals = OpaquePredicate::prepareModule(M, bcfGlobal);
-    return true;
+
+    return false;
   }
 
   virtual bool runOnFunction(Function &F) {
@@ -159,6 +159,15 @@ struct BogusCF : public FunctionPass {
 
     NumBlocksSeen += blocks.size();
     DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
+    if (blocks.empty()) {
+      return false;
+    }
+
+    LLVMContext &context = F.getContext();
+    MDNode *metaNode =
+        MDNode::get(context, MDString::get(context, metaKindName));
+    unsigned metaKind = context.getMDKindID(metaKindName);
+
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
     trial.reset(); // Independent per function
@@ -307,6 +316,7 @@ struct BogusCF : public FunctionPass {
         }
       }
 
+#if 0
       // Create Opaque Predicates
       std::uniform_int_distribution<int> distribution;
       std::uniform_int_distribution<int> distributionType(0, 1);
@@ -319,19 +329,23 @@ struct BogusCF : public FunctionPass {
             distributionType(engine));
       });
       DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
-#if 0
+#endif
+
       // Clear the unconditional branch from the "husk" original block
       block->getTerminator()->eraseFromParent();
 
-      // Create Opaque Predicate
+      // Create Opaque Predicate - will turn them into "real ones" in
+      // do finalization
       // Always true for now
       Value *lhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
       Value *rhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
       FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
 
       // Bogus conditional branch
-      BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
-#endif
+      BranchInst *branch = BranchInst::Create(originalBlock, copyBlock,
+                                              (Value *)condition, block);
+      branch->setMetadata(metaKind, metaNode);
+
       DEBUG_WITH_TYPE("cfg", F.viewCFG());
       hasBeenModified |= true;
     }
@@ -339,6 +353,58 @@ struct BogusCF : public FunctionPass {
     return hasBeenModified;
   }
 
+  // Finalisation will add the necessary opaque predicates
+  virtual bool doFinalization(Module &M) {
+    DEBUG(errs() << "Finalising: Creating Opaque Predicates\n");
+
+    std::uniform_int_distribution<int> distribution;
+    std::uniform_int_distribution<int> distributionType(0, 1);
+
+    LLVMContext &context = M.getContext();
+    unsigned metaKind = context.getMDKindID(metaKindName);
+
+    std::vector<GlobalVariable *> globals =
+        OpaquePredicate::prepareModule(M, bcfGlobal);
+    for (auto &function : M) {
+      DEBUG(errs() << "\tFunction " << function.getName() << "\n");
+      for (auto &block : function) {
+        TerminatorInst *terminator = block.getTerminator();
+        if (terminator->getMetadata(metaKind)) {
+          DEBUG(errs() << "\t\tBlock " << block.getName() << "\n");
+
+          // Checks
+          assert(terminator->getNumSuccessors() == 2 &&
+                 "Stub terminator block should only have 2 successors");
+          Instruction &condition = *(++block.rbegin());
+          assert(isa<FCmpInst>(condition) &&
+                 "Penultimate instruction should be FCmpInst");
+          FCmpInst *fcmp = dyn_cast<FCmpInst>(&condition);
+          assert(fcmp->getNumOperands() == 2 &&
+                 "Penultimate instruction should have two operands");
+          assert(
+              fcmp->getPredicate() == FCmpInst::FCMP_TRUE &&
+              "Penultimate instruction should have an always true predicate");
+
+          BasicBlock *trueBlock = terminator->getSuccessor(0);
+          BasicBlock *falseBlock = terminator->getSuccessor(1);
+          terminator->eraseFromParent();
+          fcmp->eraseFromParent();
+
+          OpaquePredicate::PredicateType type = OpaquePredicate::create(
+              &block, trueBlock, falseBlock, globals, [&]{
+            return distribution(engine);
+          },
+              [&]()->OpaquePredicate::PredicateType{
+            return static_cast<OpaquePredicate::PredicateType>(
+                distributionType(engine));
+          });
+          DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
+        }
+      }
+    }
+
+    return true;
+  }
   virtual void getAnalysisUsage(AnalysisUsage &Info) const {}
 };
 }

@@ -25,12 +25,7 @@ typedef std::function<Value *(BasicBlock *, Value *, Value *,
                               OpaquePredicate::PredicateType)> Formula;
 
 void check(BasicBlock *headBlock) {
-  // Check that our head block has a unconditional branch
-  TerminatorInst *terminator = headBlock->getTerminator();
-  BranchInst *branch = dyn_cast<BranchInst>(terminator);
-  assert(branch && "Terminator instruction must be a branch");
-  assert(branch->isUnconditional() &&
-         "Branch instruction must be unconditional");
+  // Nothing to check
 }
 
 // TODO: Use some runtime randomniser? Maybe?
@@ -228,7 +223,6 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
 
   // Check that the basic block is in a form that we want
   check(headBlock);
-  headBlock->getTerminator()->eraseFromParent();
 
   // Get our x and y
   GlobalVariable *x = globals[randomner() % globals.size()];
@@ -252,7 +246,6 @@ void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
 
   // Check that the basic block is in a form that we want
   check(headBlock);
-  headBlock->getTerminator()->eraseFromParent();
 
   // Get our x and y
   GlobalVariable *x = globals[abs(randomner()) % globals.size()];
