@@ -21,7 +21,9 @@ using namespace llvm;
 
 namespace OpaquePredicate {
 enum PredicateType {
-  PredicateFalse = 0x0, PredicateTrue = 0x1, PredicateIndeterminate = 0x2
+  PredicateFalse = 0x0,
+  PredicateTrue = 0x1,
+  PredicateIndeterminate = 0x2
 };
 
 typedef std::function<int()> Randomner;
@@ -36,19 +38,16 @@ std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number = 4);
 // Generate a randomly selected opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
-PredicateType create(BasicBlock *headBlock,
-                     BasicBlock *trueBlock,
+PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
                      BasicBlock *falseBlock,
                      const std::vector<GlobalVariable *> &globals,
-                     Randomner randomner,
-                     PredicateTypeRandomner typeRand);
+                     Randomner randomner, PredicateTypeRandomner typeRand);
 
 // Given a BasicBlock with an unconditional terminator, and two successor blocks
 // Generate an always true opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
-void createTrue(BasicBlock *headBlock,
-                BasicBlock *trueBlock,
+void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
                 BasicBlock *falseBlock,
                 const std::vector<GlobalVariable *> &globals,
                 Randomner randomner);
@@ -57,11 +56,14 @@ void createTrue(BasicBlock *headBlock,
 // Generate an always false opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
-void createFalse(BasicBlock *headBlock,
-                 BasicBlock *trueBlock,
+void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
                  BasicBlock *falseBlock,
                  const std::vector<GlobalVariable *> &globals,
                  Randomner randomner);
 };
+
+// Overloads for PredicateType
+raw_ostream &operator<<(raw_ostream &stream,
+                        const OpaquePredicate::PredicateType &o);
 
 #endif // OPAQUE_PREDICATE_H
