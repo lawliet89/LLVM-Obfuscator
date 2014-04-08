@@ -9,13 +9,20 @@
 // Opaque predicates are based on the equations given in the paper at
 // http://crypto.cs.mcgill.ca/~garboit/sp-paper.pdf
 
+#define DEBUG_TYPE "opaque"
 #include "Transform/opaque_predicate.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 using namespace llvm;
 
 namespace {
+
+typedef std::function<Value *(BasicBlock *, Value *, Value *,
+                              OpaquePredicate::PredicateType)> Formula;
+
 void check(BasicBlock *headBlock) {
   // Check that our head block has a unconditional branch
   TerminatorInst *terminator = headBlock->getTerminator();
@@ -39,18 +46,19 @@ Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
 }
 
 // 7y^2 -1 != x^2 for all x, y in Z
-Value *formula1(BasicBlock *block, Value *x1, Value *y1, Value *&x2, Value *&y4,
+Value *formula0(BasicBlock *block, Value *x1, Value *y1,
                 OpaquePredicate::PredicateType type) {
 
   assert(type != OpaquePredicate::PredicateIndeterminate &&
-         "Formula 1 does not support indeterminate!");
+         "Formula 0 does not support indeterminate!");
 
   Value *seven =
       ConstantInt::get(Type::getInt32Ty(block->getContext()), 7, false);
   Value *one =
       ConstantInt::get(Type::getInt32Ty(block->getContext()), 1, false);
   // x^2
-  x2 = (Value *)BinaryOperator::Create(Instruction::Mul, x1, x1, "", block);
+  Value *x2 =
+      (Value *)BinaryOperator::Create(Instruction::Mul, x1, x1, "", block);
   // y^2
   Value *y2 =
       (Value *)BinaryOperator::Create(Instruction::Mul, y1, y1, "", block);
@@ -58,7 +66,8 @@ Value *formula1(BasicBlock *block, Value *x1, Value *y1, Value *&x2, Value *&y4,
   Value *y3 =
       (Value *)BinaryOperator::Create(Instruction::Mul, y2, seven, "", block);
   // 7y^2 - 1
-  y4 = (Value *)BinaryOperator::Create(Instruction::Sub, y3, one, "", block);
+  Value *y4 =
+      (Value *)BinaryOperator::Create(Instruction::Sub, y3, one, "", block);
 
   Value *condition;
   // Compare
@@ -70,6 +79,103 @@ Value *formula1(BasicBlock *block, Value *x1, Value *y1, Value *&x2, Value *&y4,
                                 "", block);
 
   return condition;
+}
+
+// (x^3 - x) % 3 == 0 for all x in Z
+Value *formula1(BasicBlock *block, Value *x1, Value *y1,
+                OpaquePredicate::PredicateType type) {
+  // y1 is unused
+  assert(type != OpaquePredicate::PredicateIndeterminate &&
+         "Formula 1 does not support indeterminate!");
+
+  // x^2
+  Value *x2 =
+      (Value *)BinaryOperator::Create(Instruction::Mul, x1, x1, "", block);
+
+  // x^3
+  Value *x3 =
+      (Value *)BinaryOperator::Create(Instruction::Mul, x2, x1, "", block);
+
+  // x^3 - x
+  Value *x4 =
+      (Value *)BinaryOperator::Create(Instruction::Sub, x3, x1, "", block);
+
+  Value *three =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 3, false);
+
+  // Finally the mod
+  Value *mod =
+      (Value *)BinaryOperator::Create(Instruction::SRem, x4, three, "", block);
+
+  Value *zero =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 0, true);
+
+  Value *condition;
+  // Compare
+  if (type == OpaquePredicate::PredicateTrue)
+    condition = CmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_EQ, mod, zero,
+                                "", block);
+  else
+    condition = CmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_NE, mod, zero,
+                                "", block);
+
+  return condition;
+}
+
+// x % 2 == 0 || (x^2 - 1) % 8 == 0 for all x in Z
+Value *formula2(BasicBlock *block, Value *x1, Value *y1,
+                OpaquePredicate::PredicateType type) {
+  // y1 is unused
+  assert(type != OpaquePredicate::PredicateIndeterminate &&
+         "Formula 2 does not support indeterminate!");
+
+  Value *zero =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 0, true);
+  Value *one =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 1, false);
+  Value *two =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 2, false);
+  Value *eight =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 8, false);
+
+  // x^2
+  Value *x2 =
+      (Value *)BinaryOperator::Create(Instruction::Mul, x1, x1, "", block);
+  // x^2- 1
+  Value *x3 =
+      (Value *)BinaryOperator::Create(Instruction::Sub, x2, one, "", block);
+
+  // x % 2
+  Value *xMod2 =
+      (Value *)BinaryOperator::Create(Instruction::SRem, x1, two, "", block);
+
+  // (x^2 - 1) mod 8
+  Value *xMod8 =
+      (Value *)BinaryOperator::Create(Instruction::SRem, x3, eight, "", block);
+
+  // x % 2 == 0
+  Value *lhs = CmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_EQ, xMod2,
+                               zero, "", block);
+  // (x^2 - 1) mod 8 == 0
+  Value *rhs = CmpInst::Create(Instruction::ICmp, ICmpInst::ICMP_EQ, xMod8,
+                               zero, "", block);
+
+  Value *condition =
+      (Value *)BinaryOperator::Create(Instruction::Or, lhs, rhs, "", block);
+
+  // If false, we just negate
+  if (type == OpaquePredicate::PredicateFalse)
+    condition = BinaryOperator::CreateNot(condition, "", block);
+
+  return condition;
+}
+
+Formula getFormula(OpaquePredicate::Randomner randomner) {
+  static const int number = 3;
+  static Formula formales[number] = { formula0, formula1, formula2 };
+  int n = randomner() % number;
+  DEBUG(errs() << "Opaque Predicate Formula " << n << "\n");
+  return formales[n];
 }
 };
 
@@ -124,8 +230,8 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
   Value *x1 = advanceGlobal(headBlock, x, randomner);
   Value *y1 = advanceGlobal(headBlock, y, randomner);
 
-  Value *x2, *y2;
-  Value *condition = formula1(headBlock, x1, y1, x2, y2, PredicateTrue);
+  Formula formula = getFormula(randomner);
+  Value *condition = formula(headBlock, x1, y1, PredicateTrue);
 
   // Branch
   BranchInst::Create(trueBlock, falseBlock, condition, headBlock);
@@ -148,8 +254,8 @@ void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
   Value *x1 = advanceGlobal(headBlock, x, randomner);
   Value *y1 = advanceGlobal(headBlock, y, randomner);
 
-  Value *x2, *y2;
-  Value *condition = formula1(headBlock, x1, y1, x2, y2, PredicateFalse);
+  Formula formula = getFormula(randomner);
+  Value *condition = formula(headBlock, x1, y1, PredicateFalse);
 
   // Branch
   BranchInst::Create(trueBlock, falseBlock, condition, headBlock);
