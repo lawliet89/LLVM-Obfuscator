@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 // Opaque predicates are based on the equations given in the paper at
 // http://crypto.cs.mcgill.ca/~garboit/sp-paper.pdf
+// TODO: Natural Number and exponential formulaes
 
 #define DEBUG_TYPE "opaque"
 #include "Transform/opaque_predicate.h"
