@@ -64,7 +64,7 @@ static cl::opt<std::string> bcfSeed(
     cl::desc("Seed for random number generator. Defaults to system time"));
 
 static cl::opt<unsigned> bcfGlobal(
-    "bcfProbability", cl::init(4),
+    "bcfGlobal", cl::init(4),
     cl::desc("Number of global variables in a module for opaque predicates"));
 
 STATISTIC(NumBlocksSeen, "Number of basic blocks processed (excluding skips "

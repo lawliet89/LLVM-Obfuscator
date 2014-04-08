@@ -36,13 +36,18 @@ void check(BasicBlock *headBlock) {
 // TODO: Use some runtime randomniser? Maybe?
 Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
                      OpaquePredicate::Randomner randomner) {
+  assert(global && "Null global pointer");
+  DEBUG(errs() << "[Opaque Predicate] Randomly advancing global\n");
+  DEBUG(errs() << "\tCreating Random Constant\n");
   Value *random = ConstantInt::get(Type::getInt32Ty(block->getContext()),
                                    randomner(), true);
+  DEBUG(errs() << "\tLoading global\n");
   LoadInst *load = new LoadInst((Value *)global, "", block);
+  DEBUG(errs() << "\tAdding global\n");
   BinaryOperator *add = BinaryOperator::Create(Instruction::Add, (Value *)load,
                                                (Value *)random, "", block);
-  // Store
-  StoreInst *store = new StoreInst(add, (Value *)global, block);
+  DEBUG(errs() << "\tStoring global\n");
+  new StoreInst(add, (Value *)global, block);
   return (Value *)add;
 }
 
@@ -165,17 +170,17 @@ Value *formula2(BasicBlock *block, Value *x1, Value *y1,
       (Value *)BinaryOperator::Create(Instruction::Or, lhs, rhs, "", block);
 
   // If false, we just negate
-  if (type == OpaquePredicate::PredicateFalse)
-    condition = BinaryOperator::CreateNot(condition, "", block);
-
-  return condition;
+  if (type == OpaquePredicate::PredicateTrue)
+    return condition;
+  else if (type == OpaquePredicate::PredicateFalse)
+    return BinaryOperator::CreateNot(condition, "", block);
 }
 
 Formula getFormula(OpaquePredicate::Randomner randomner) {
   static const int number = 3;
   static Formula formales[number] = { formula0, formula1, formula2 };
   int n = randomner() % number;
-  DEBUG(errs() << "Opaque Predicate Formula " << n << "\n");
+  DEBUG(errs() << "[Opaque Predicate] Formula " << n << "\n");
   return formales[n];
 }
 };
@@ -183,12 +188,14 @@ Formula getFormula(OpaquePredicate::Randomner randomner) {
 namespace OpaquePredicate {
 std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number) {
   assert(number >= 2 && "Opaque Predicates need at least 2 global variables");
+  DEBUG(errs() << "[Opaque Predicate] Creating " << number << " globals\n");
   std::vector<GlobalVariable *> globals(number);
   for (unsigned i = 0; i < number; ++i) {
     Value *zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0, true);
-    GlobalVariable *global =
-        new GlobalVariable(M, Type::getInt32Ty(M.getContext()), false,
-                           GlobalValue::CommonLinkage, (Constant *)zero);
+    GlobalVariable *global = new GlobalVariable(
+        M, Type::getInt32Ty(M.getContext()), false, GlobalValue::CommonLinkage,
+        (Constant *)zero, "", nullptr, GlobalVariable::GeneralDynamicTLSModel);
+    assert(global && "Null globals created!");
     globals[i] = global;
   }
   return globals;
@@ -224,8 +231,8 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
   headBlock->getTerminator()->eraseFromParent();
 
   // Get our x and y
-  GlobalVariable *x = globals[abs(randomner()) % globals.size()];
-  GlobalVariable *y = globals[abs(randomner()) % globals.size()];
+  GlobalVariable *x = globals[randomner() % globals.size()];
+  GlobalVariable *y = globals[randomner() % globals.size()];
 
   // Advance our x and y
   Value *x1 = advanceGlobal(headBlock, x, randomner);
