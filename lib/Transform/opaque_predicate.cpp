@@ -24,10 +24,6 @@ namespace {
 typedef std::function<Value *(BasicBlock *, Value *, Value *,
                               OpaquePredicate::PredicateType)> Formula;
 
-void check(BasicBlock *headBlock) {
-  // Nothing to check
-}
-
 // TODO: Use some runtime randomniser? Maybe?
 Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
                      OpaquePredicate::Randomner randomner) {
@@ -167,7 +163,7 @@ Value *formula2(BasicBlock *block, Value *x1, Value *y1,
   // If false, we just negate
   if (type == OpaquePredicate::PredicateTrue)
     return condition;
-  else if (type == OpaquePredicate::PredicateFalse)
+  else
     return BinaryOperator::CreateNot(condition, "", block);
 }
 
@@ -220,10 +216,6 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
                 BasicBlock *falseBlock,
                 const std::vector<GlobalVariable *> &globals,
                 Randomner randomner) {
-
-  // Check that the basic block is in a form that we want
-  check(headBlock);
-
   // Get our x and y
   GlobalVariable *x = globals[randomner() % globals.size()];
   GlobalVariable *y = globals[randomner() % globals.size()];
@@ -243,10 +235,6 @@ void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
                  BasicBlock *falseBlock,
                  const std::vector<GlobalVariable *> &globals,
                  Randomner randomner) {
-
-  // Check that the basic block is in a form that we want
-  check(headBlock);
-
   // Get our x and y
   GlobalVariable *x = globals[abs(randomner()) % globals.size()];
   GlobalVariable *y = globals[abs(randomner()) % globals.size()];

@@ -34,7 +34,7 @@ typedef std::function<PredicateType()> PredicateTypeRandomner;
 // Needs at least 2 global variables
 std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number = 4);
 
-// Given a BasicBlock with an unconditional terminator, and two successor blocks
+// Given a BasicBlock with NO terminator, and two successor blocks
 // Generate a randomly selected opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
@@ -43,7 +43,7 @@ PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
                      const std::vector<GlobalVariable *> &globals,
                      Randomner randomner, PredicateTypeRandomner typeRand);
 
-// Given a BasicBlock with an unconditional terminator, and two successor blocks
+// Given a BasicBlock with NO terminator, and two successor blocks
 // Generate an always true opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
@@ -52,7 +52,7 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
                 const std::vector<GlobalVariable *> &globals,
                 Randomner randomner);
 
-// Given a BasicBlock with an unconditional terminator, and two successor blocks
+// Given a BasicBlock with NO terminator, and two successor blocks
 // Generate an always false opaque predicate to replace the terminator
 // and then branch to the given blocks
 // Returns the type of predicate produced
