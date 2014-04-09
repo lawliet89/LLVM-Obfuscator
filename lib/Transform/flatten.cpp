@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-
+// http://ac.inf.elte.hu/Vol_030_2009/003.pdf
 #define DEBUG_TYPE "flatten"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
@@ -31,11 +31,10 @@
 
 using namespace llvm;
 
-
 static cl::list<std::string>
     flattenFunc("flattenFunc", cl::CommaSeparated,
-            cl::desc("Insert Bogus Control Flow only for some functions: "
-                     "flattenFunc=\"func1,func2\""));
+                cl::desc("Insert Bogus Control Flow only for some functions: "
+                         "flattenFunc=\"func1,func2\""));
 
 static cl::opt<std::string> flattenSeed(
     "flattenSeed", cl::init(""),
@@ -64,7 +63,6 @@ struct Flatten : public FunctionPass {
   }
 
   virtual bool runOnFunction(Function &F) {
-    bool hasBeenModified = false;
     // If the function is declared elsewhere in other translation unit
     // we should not modify it here
     if (F.isDeclaration()) {
@@ -72,6 +70,7 @@ struct Flatten : public FunctionPass {
     }
     DEBUG(errs() << "flatten: Function '" << F.getName() << "'\n");
 
+    // Check if function is requested
     auto funcListStart = flattenFunc.begin(), funcListEnd = flattenFunc.end();
     if (flattenFunc.size() != 0 &&
         std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
@@ -102,30 +101,42 @@ struct Flatten : public FunctionPass {
         DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
         continue;
       }
+      if (&block == &F.getEntryBlock()){
+        DEBUG(errs() << "\t\tSkipping: Entry block\n");
+        continue;
+      }
+
       DEBUG(errs() << "\t\tAdding block\n");
       blocks.push_back(&block);
     }
 
     DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
-    if (blocks.empty()) {
+    if (blocks.size() < 2) {
+      DEBUG(errs() << "\tNothing left to flatten\n");
       return false;
     }
+    // Setup other variables
+    BasicBlock &entryBlock = F.getEntryBlock();
+
+    if (entryBlock.getTerminator()->getNumSuccessors() == blocks.size()) {
+      DEBUG(errs() << "\tFunction is trivial -- already flat control flow\n");
+      return false;
+    }
+
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
-    return hasBeenModified;
+
+    return true;
   }
 
   // Finalisation will add the necessary opaque predicates
-  virtual bool doFinalization(Module &M) {
-   return false;
-  }
-  virtual void getAnalysisUsage(AnalysisUsage &Info) const {}
+  // virtual bool doFinalization(Module &M) { return false; }
+  // virtual void getAnalysisUsage(AnalysisUsage &Info) const {}
 };
 }
 
 char Flatten::ID = 0;
-static RegisterPass<Flatten>
-    X("flatten", "Flatten function control flow", false,
-      false);
+static RegisterPass<Flatten> X("flatten", "Flatten function control flow",
+                               false, false);
 
   // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
