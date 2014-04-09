@@ -22,7 +22,9 @@
 // Debug types:
 // - boguscf - Bogus CF related
 // - cfg - View CFG of functions before and after transformation
-// TODO Stats
+// TODO:
+//  - Mangle basic block that is not in the predicate path
+//  - Indeterminate opaque predicate
 
 #define DEBUG_TYPE "boguscf"
 #include "Transform/opaque_predicate.h"
@@ -367,9 +369,11 @@ struct BogusCF : public FunctionPass {
         OpaquePredicate::prepareModule(M, bcfGlobal);
     for (auto &function : M) {
       DEBUG(errs() << "\tFunction " << function.getName() << "\n");
+      bool functionHasBlock = false;
       for (auto &block : function) {
         TerminatorInst *terminator = block.getTerminator();
         if (terminator->getMetadata(metaKind)) {
+          functionHasBlock = true;
           DEBUG(errs() << "\t\tBlock " << block.getName() << "\n");
 
           // Checks
@@ -400,6 +404,9 @@ struct BogusCF : public FunctionPass {
           });
           DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
         }
+      }
+      if (functionHasBlock) {
+        DEBUG_WITH_TYPE("cfg", function.viewCFG());
       }
     }
 
