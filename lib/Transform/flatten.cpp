@@ -283,7 +283,7 @@ struct Flatten : public FunctionPass {
             BasicBlock *userBlock = userInst->getParent();
             if (userBlock == jumpBlock) {
               phi = dyn_cast<PHINode>(userInst);
-              if (phi != jumpIndex) {
+              if (phi  && phi != jumpIndex) {
                 isUsed = true;
                 break;
               }
@@ -303,6 +303,7 @@ struct Flatten : public FunctionPass {
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
+            DemotePHIToStack(phi);
           }
         }
       }
