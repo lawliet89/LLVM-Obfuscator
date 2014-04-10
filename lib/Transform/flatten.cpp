@@ -149,7 +149,7 @@ struct Flatten : public FunctionPass {
 
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
-    for (auto block :blocks){
+    for (auto block : blocks) {
       std::vector<PHINode *> phis;
       for (auto &inst : *block) {
         if (PHINode *phiInst = dyn_cast<PHINode>(&inst)) {
@@ -268,42 +268,51 @@ struct Flatten : public FunctionPass {
 
       indirectBranch->addDestination(block);
 
-      // TODO PHI Nodes
-      // if (hasSuccessor) {
-      //   DEBUG(errs() << "\t\tHandling successor use\n");
-      //   std::vector<PHINode *> movePHI;
-      //   for (auto &inst : *block) {
-      //     DEBUG(errs() << "\t\t\t" << inst << "\n");
-      //     std::vector<User *> users;
-      //     PHINode *phi = nullptr;
-      //     bool isUsed = false;
-      //     // Find the phi node in jumpBlock if it's there
-      //     for (auto user = inst.use_begin(), useEnd = inst.use_end();
-      //          user != useEnd; ++user) {
-      //       Instruction *userInst = dyn_cast<Instruction>(*user);
-      //       assert(userInst && "User is not an instruction");
-      //       BasicBlock *userBlock = userInst->getParent();
-      //       if (userBlock == jumpBlock) {
-      //         phi = dyn_cast<PHINode>(userInst);
-      //         isUsed = true;
-      //         break;
-      //       } else if (userBlock != block) {
-      //         isUsed = true;
-      //         users.push_back(*user);
-      //         DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
-      //                      << "\n");
-      //       }
-      //     }
-      //     // if (isUsed && !phi) {
-      //     //   phi = jumpBuilder.CreatePHI(inst.getType(), users.size(), "");
-      //     //   phi->moveBefore(indirectBranch);
-      //     // }
-      //     // // phi->addIncoming(&inst, block);
-      //     // for (User *user : users) {
-      //     //   user->replaceUsesOfWith(&inst, phi);
-      //     // }
-      //   }
-      // }
+      if (hasSuccessor) {
+        DEBUG(errs() << "\t\tHandling successor use\n");
+        for (auto &inst : *block) {
+          DEBUG(errs() << "\t\t\t" << inst << "\n");
+          std::vector<User *> users;
+          PHINode *phi = nullptr;
+          bool isUsed = false;
+          // Find the phi node in jumpBlock if it's there
+          for (auto user = inst.use_begin(), useEnd = inst.use_end();
+               user != useEnd; ++user) {
+            Instruction *userInst = dyn_cast<Instruction>(*user);
+            assert(userInst && "User is not an instruction");
+            BasicBlock *userBlock = userInst->getParent();
+            if (userBlock == jumpBlock) {
+              phi = dyn_cast<PHINode>(userInst);
+              isUsed = true;
+              break;
+            } else if (userBlock != block) {
+              isUsed = true;
+              users.push_back(*user);
+              DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
+                           << "\n");
+            }
+          }
+          if (isUsed && !phi) {
+            phi = jumpBuilder.CreatePHI(inst.getType(), users.size(), "");
+            phi->moveBefore(jumpBlock->begin());
+          }
+          if (isUsed) {
+            phi->addIncoming(&inst, block);
+            for (User *user : users) {
+              user->replaceUsesOfWith(&inst, phi);
+            }
+          }
+        }
+      }
+    }
+
+    // Remove duplicates from PHINode
+    auto removeFrom =
+        std::unique(jumpIndex->block_begin(), jumpIndex->block_end());
+    std::vector<BasicBlock *> removeBlocks(removeFrom, jumpIndex->block_end());
+
+    for (auto block : removeBlocks) {
+      jumpIndex->removeIncomingValue(block);
     }
 
     assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
