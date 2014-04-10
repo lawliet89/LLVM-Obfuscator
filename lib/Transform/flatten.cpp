@@ -283,8 +283,10 @@ struct Flatten : public FunctionPass {
             BasicBlock *userBlock = userInst->getParent();
             if (userBlock == jumpBlock) {
               phi = dyn_cast<PHINode>(userInst);
-              isUsed = true;
-              break;
+              if (phi != jumpIndex) {
+                isUsed = true;
+                break;
+              }
             } else if (userBlock != block) {
               isUsed = true;
               users.push_back(*user);
@@ -306,21 +308,14 @@ struct Flatten : public FunctionPass {
       }
     }
 
-    // Remove duplicates from PHINode
-    auto removeFrom =
-        std::unique(jumpIndex->block_begin(), jumpIndex->block_end());
-    std::vector<BasicBlock *> removeBlocks(removeFrom, jumpIndex->block_end());
-
-    for (auto block : removeBlocks) {
-      jumpIndex->removeIncomingValue(block);
-    }
-
     assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
 
     for (auto inst = jumpBlock->begin(), instEnd = jumpBlock->end();
          inst != instEnd; ++inst) {
       PHINode *phi = dyn_cast<PHINode>((Instruction *)inst);
+      if (phi == jumpIndex)
+        continue;
       if (!phi)
         continue;
       if ((Instruction *)inst == jumpBlock->getFirstNonPHIOrDbgOrLifetime())
