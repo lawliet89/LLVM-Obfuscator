@@ -16,6 +16,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -146,6 +147,20 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
+    // Demote all the PHI Nodes to stack
+    DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
+    for (auto block :blocks){
+      std::vector<PHINode *> phis;
+      for (auto &inst : *block) {
+        if (PHINode *phiInst = dyn_cast<PHINode>(&inst)) {
+          phis.push_back(phiInst);
+        }
+      }
+      for (auto phiInst : phis) {
+        DemotePHIToStack(phiInst);
+      }
+    }
+
     BasicBlock *initialBlock;
     // Going to have to split the entry block into 2 blocks
     if (entryBlock.getTerminator()->getNumSuccessors() > 1) {
@@ -192,8 +207,6 @@ struct Flatten : public FunctionPass {
         jumpBuilder.CreateIndirectBr(jumpAddress, blocks.size());
     assert(indirectBranch && "IndirectBranchInst cannot be null!");
 
-    // TODO Create default unreachable
-
     for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
       BasicBlock *block = blocks[i];
       assert(block != &entryBlock && "Entry block should not be processed!");
@@ -206,6 +219,7 @@ struct Flatten : public FunctionPass {
       }
 
       TerminatorInst *terminator = block->getTerminator();
+      bool hasSuccessor = terminator->getNumSuccessors() > 0;
       if (terminator->getNumSuccessors() == 0) {
         // No need to do anything
         DEBUG(errs() << "\t\t0 Successor\n");
@@ -255,9 +269,60 @@ struct Flatten : public FunctionPass {
       indirectBranch->addDestination(block);
 
       // TODO PHI Nodes
+      // if (hasSuccessor) {
+      //   DEBUG(errs() << "\t\tHandling successor use\n");
+      //   std::vector<PHINode *> movePHI;
+      //   for (auto &inst : *block) {
+      //     DEBUG(errs() << "\t\t\t" << inst << "\n");
+      //     std::vector<User *> users;
+      //     PHINode *phi = nullptr;
+      //     bool isUsed = false;
+      //     // Find the phi node in jumpBlock if it's there
+      //     for (auto user = inst.use_begin(), useEnd = inst.use_end();
+      //          user != useEnd; ++user) {
+      //       Instruction *userInst = dyn_cast<Instruction>(*user);
+      //       assert(userInst && "User is not an instruction");
+      //       BasicBlock *userBlock = userInst->getParent();
+      //       if (userBlock == jumpBlock) {
+      //         phi = dyn_cast<PHINode>(userInst);
+      //         isUsed = true;
+      //         break;
+      //       } else if (userBlock != block) {
+      //         isUsed = true;
+      //         users.push_back(*user);
+      //         DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
+      //                      << "\n");
+      //       }
+      //     }
+      //     // if (isUsed && !phi) {
+      //     //   phi = jumpBuilder.CreatePHI(inst.getType(), users.size(), "");
+      //     //   phi->moveBefore(indirectBranch);
+      //     // }
+      //     // // phi->addIncoming(&inst, block);
+      //     // for (User *user : users) {
+      //     //   user->replaceUsesOfWith(&inst, phi);
+      //     // }
+      //   }
+      // }
     }
+
     assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
+
+    for (auto inst = jumpBlock->begin(), instEnd = jumpBlock->end();
+         inst != instEnd; ++inst) {
+      PHINode *phi = dyn_cast<PHINode>((Instruction *)inst);
+      if (!phi)
+        continue;
+      if ((Instruction *)inst == jumpBlock->getFirstNonPHIOrDbgOrLifetime())
+        break;
+      for (auto pred = pred_begin(jumpBlock), predEnd = pred_end(jumpBlock);
+           pred != predEnd; ++pred) {
+        if (phi->getBasicBlockIndex(*pred) == -1) {
+          phi->addIncoming(phi, *pred);
+        }
+      }
+    }
 
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
