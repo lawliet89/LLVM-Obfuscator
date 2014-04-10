@@ -122,6 +122,12 @@ struct Flatten : public FunctionPass {
         return false;
       }
 
+      if (isa<SwitchInst>(block.getTerminator())) {
+        // TODO Maybe handle this
+        DEBUG(errs() << "\tSkipping function -- SwitchInst encountered");
+        return false;
+      }
+
       DEBUG(errs() << "\t\tAdding block\n");
       blocks.push_back(&block);
     }
@@ -203,6 +209,7 @@ struct Flatten : public FunctionPass {
       if (terminator->getNumSuccessors() == 0) {
         // No need to do anything
         DEBUG(errs() << "\t\t0 Successor\n");
+        // ReturnInst, ResumeInst, UnreachableInst
       } else if (terminator->getNumSuccessors() == 1) {
         // Trivial
         DEBUG(errs() << "\t\t1 Successor\n");
@@ -232,9 +239,6 @@ struct Flatten : public FunctionPass {
           Value *destination =
               findBlock(context, blocks, invoke->getNormalDest());
           jumpIndex->addIncoming(destination, block);
-        } else if (SwitchInst *switchInst = dyn_cast<SwitchInst>(terminator)) {
-          // TODO Switch instruction
-          DEBUG(errs() << "\t\tSwitch\n");
         } else {
           llvm_unreachable("Unexpected TerminatorInst encountered!");
         }
@@ -250,7 +254,7 @@ struct Flatten : public FunctionPass {
 
       indirectBranch->addDestination(block);
 
-      // TODO: PHI for Values
+      // TODO PHI Nodes
     }
     assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
