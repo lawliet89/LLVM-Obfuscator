@@ -48,6 +48,15 @@ struct Flatten : public FunctionPass {
 
   Flatten() : FunctionPass(ID) {}
 
+  inline Value *findBlock(LLVMContext &context,
+                          std::vector<BasicBlock *> &blocks,
+                          BasicBlock *block) {
+    auto iterator = std::find(blocks.begin(), blocks.end(), block);
+    assert(iterator != blocks.end() && "Block does not exist in vector!");
+    unsigned index = iterator - blocks.begin();
+    return ConstantInt::get(Type::getInt32Ty(context), index, false);
+  }
+
   // Initialise and check options
   virtual bool doInitialization(Module &M) {
     // Seed engine and create distribution
@@ -79,6 +88,8 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
+    LLVMContext &context = F.getContext();
+
     // Use a vector to store the list of blocks
     std::vector<BasicBlock *> blocks;
     blocks.reserve(F.size());
@@ -103,6 +114,12 @@ struct Flatten : public FunctionPass {
       if (&block == &F.getEntryBlock()) {
         DEBUG(errs() << "\t\tSkipping: Entry block\n");
         continue;
+      }
+
+      if (isa<IndirectBrInst>(block.getTerminator())) {
+        // TODO Maybe handle this
+        DEBUG(errs() << "\tSkipping function -- IndirectBrInst encountered");
+        return false;
       }
 
       DEBUG(errs() << "\t\tAdding block\n");
@@ -136,24 +153,108 @@ struct Flatten : public FunctionPass {
     DEBUG(initialBlock->setName("initial_block"));
 
     entryBlock.getTerminator()->eraseFromParent();
-    BasicBlock *jumpBlock = BasicBlock::Create(F.getContext(), "", &F);
-    BranchInst::Create(jumpBlock, &entryBlock);
-    DEBUG(jumpBlock->setName("jump_block"));
 
     // Entry Block builder
+    IRBuilder<> entryBuilder(&entryBlock);
+
+    BasicBlock *jumpBlock = BasicBlock::Create(context, "", &F);
+    DEBUG(jumpBlock->setName("jump_block"));
+
+    // Jump Block builder
     IRBuilder<> jumpBuilder(jumpBlock);
 
     Twine jumpIndexName("");
-    DEBUG(jumpIndexName.concat("jump_index"));
-    Value *zero = ConstantInt::get(Type::getInt32Ty(F.getContext()), 0, false);
-    AllocaInst *jumpIndex = jumpBuilder.CreateAlloca(
-        Type::getInt32Ty(F.getContext()), zero, jumpIndexName);
+    DEBUG(jumpIndexName = jumpIndexName.concat("jump_index"));
+    PHINode *jumpIndex = jumpBuilder.CreatePHI(
+        Type::getInt32Ty(context), blocks.size() + 1, jumpIndexName);
 
-    // Process blocks
-    for (BasicBlock *block : blocks) {
+    DEBUG(errs() << "\tCreating jump table:\n");
+
+    Twine jumpTableName("");
+    DEBUG(jumpTableName = jumpTableName.concat("jump_table"));
+    Value *jumpTableSize =
+        ConstantInt::get(Type::getInt32Ty(context), blocks.size(), false);
+    AllocaInst *jumpTable = entryBuilder.CreateAlloca(
+        Type::getInt8PtrTy(context), jumpTableSize, jumpTableName);
+
+    // Create indirect branch
+    Twine jumpAddrName("");
+    DEBUG(jumpAddrName = jumpAddrName.concat("jump_addr"));
+    Value *jumpAddress =
+        jumpBuilder.CreateGEP(jumpTable, jumpIndex, jumpAddrName);
+    IndirectBrInst *indirectBranch =
+        jumpBuilder.CreateIndirectBr(jumpAddress, blocks.size());
+    assert(indirectBranch && "IndirectBranchInst cannot be null!");
+
+    // TODO Create default unreachable
+
+    for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
+      BasicBlock *block = blocks[i];
       assert(block != &entryBlock && "Entry block should not be processed!");
       DEBUG(errs() << "\t" << block->getName() << ":\n");
+      Value *index = ConstantInt::get(Type::getInt32Ty(context), i, false);
+
+      // Create jump index
+      if (block == initialBlock) {
+        jumpIndex->addIncoming(index, &entryBlock);
+      }
+
+      TerminatorInst *terminator = block->getTerminator();
+      if (terminator->getNumSuccessors() == 0) {
+        // No need to do anything
+        DEBUG(errs() << "\t\t0 Successor\n");
+      } else if (terminator->getNumSuccessors() == 1) {
+        // Trivial
+        DEBUG(errs() << "\t\t1 Successor\n");
+        BasicBlock *destination = terminator->getSuccessor(0);
+        Value *destinationIndexValue = findBlock(context, blocks, destination);
+        jumpIndex->addIncoming(destinationIndexValue, block);
+
+        terminator->eraseFromParent();
+        BranchInst::Create(jumpBlock, block);
+      } else { // > 1 succesors
+        DEBUG(errs() << "\t\t" << terminator->getNumSuccessors()
+                     << " Successors\n");
+        // Conditional branch
+        if (BranchInst *branch = dyn_cast<BranchInst>(terminator)) {
+          DEBUG(errs() << "\t\tConditional branch\n");
+          BasicBlock *trueBlock = branch->getSuccessor(0);
+          BasicBlock *falseBlock = branch->getSuccessor(1);
+          Value *trueIndex = findBlock(context, blocks, trueBlock);
+          Value *falseIndex = findBlock(context, blocks, falseBlock);
+          SelectInst *select = SelectInst::Create(
+              branch->getCondition(), trueIndex, falseIndex, "", terminator);
+
+          jumpIndex->addIncoming(select, block);
+        } else if (InvokeInst *invoke = dyn_cast<InvokeInst>(terminator)) {
+          // InvokeInst
+          DEBUG(errs() << "\t\tInvoke Terminator\n");
+          Value *destination =
+              findBlock(context, blocks, invoke->getNormalDest());
+          jumpIndex->addIncoming(destination, block);
+        } else if (SwitchInst *switchInst = dyn_cast<SwitchInst>(terminator)) {
+          // TODO Switch instruction
+          DEBUG(errs() << "\t\tSwitch\n");
+        } else {
+          llvm_unreachable("Unexpected TerminatorInst encountered!");
+        }
+
+        terminator->eraseFromParent();
+        BranchInst::Create(jumpBlock, block);
+      }
+
+      // Add to jump table
+      Value *ptr = entryBuilder.CreateGEP(jumpTable, index);
+      BlockAddress *blockAddress = BlockAddress::get(block);
+      entryBuilder.CreateStore((Value *)blockAddress, ptr);
+
+      indirectBranch->addDestination(block);
+
+      // TODO: PHI for Values
     }
+    assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
+    entryBuilder.CreateBr(jumpBlock);
+
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
