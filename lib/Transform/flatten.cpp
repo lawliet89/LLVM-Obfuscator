@@ -19,6 +19,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/User.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -32,9 +33,9 @@
 using namespace llvm;
 
 static cl::list<std::string>
-    flattenFunc("flattenFunc", cl::CommaSeparated,
-                cl::desc("Insert Bogus Control Flow only for some functions: "
-                         "flattenFunc=\"func1,func2\""));
+flattenFunc("flattenFunc", cl::CommaSeparated,
+            cl::desc("Insert Bogus Control Flow only for some functions: "
+                     "flattenFunc=\"func1,func2\""));
 
 static cl::opt<std::string> flattenSeed(
     "flattenSeed", cl::init(""),
@@ -88,9 +89,7 @@ struct Flatten : public FunctionPass {
     DEBUG(errs() << "\tListing and filtering blocks\n");
     // Get original list of blocks
     for (auto &block : F) {
-      DEBUG(if (!block.hasName()) {
-        block.setName(blockPrefix + Twine(i++));
-      });
+      DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
 
       DEBUG(errs() << "\tBlock " << block.getName() << "\n");
       BasicBlock::iterator inst1 = block.begin();
@@ -101,7 +100,7 @@ struct Flatten : public FunctionPass {
         DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
         continue;
       }
-      if (&block == &F.getEntryBlock()){
+      if (&block == &F.getEntryBlock()) {
         DEBUG(errs() << "\t\tSkipping: Entry block\n");
         continue;
       }
@@ -118,12 +117,45 @@ struct Flatten : public FunctionPass {
     // Setup other variables
     BasicBlock &entryBlock = F.getEntryBlock();
 
-    if (entryBlock.getTerminator()->getNumSuccessors() == blocks.size()) {
+    if (entryBlock.getTerminator()->getNumSuccessors() == blocks.size() ||
+        entryBlock.getTerminator()->getNumSuccessors() == 0) {
       DEBUG(errs() << "\tFunction is trivial -- already flat control flow\n");
       return false;
     }
 
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+    BasicBlock *initialBlock;
+    // Going to have to split the entry block into 2 blocks
+    if (entryBlock.getTerminator()->getNumSuccessors() > 1) {
+      DEBUG(errs() << "\tFSplitting entry block\n");
+      initialBlock = entryBlock.splitBasicBlock(entryBlock.getTerminator());
+      blocks.push_back(initialBlock);
+    } else {
+      initialBlock = entryBlock.getTerminator()->getSuccessor(0);
+    }
+    DEBUG(entryBlock.setName("entry_block"));
+    DEBUG(initialBlock->setName("initial_block"));
+
+    entryBlock.getTerminator()->eraseFromParent();
+    BasicBlock *jumpBlock = BasicBlock::Create(F.getContext(), "", &F);
+    BranchInst::Create(jumpBlock, &entryBlock);
+    DEBUG(jumpBlock->setName("jump_block"));
+
+    // Entry Block builder
+    IRBuilder<> jumpBuilder(jumpBlock);
+
+    Twine jumpIndexName("");
+    DEBUG(jumpIndexName.concat("jump_index"));
+    Value *zero = ConstantInt::get(Type::getInt32Ty(F.getContext()), 0, false);
+    AllocaInst *jumpIndex = jumpBuilder.CreateAlloca(
+        Type::getInt32Ty(F.getContext()), zero, jumpIndexName);
+
+    // Process blocks
+    for (BasicBlock *block : blocks) {
+      assert(block != &entryBlock && "Entry block should not be processed!");
+      DEBUG(errs() << "\t" << block->getName() << ":\n");
+    }
+    DEBUG(F.viewCFG());
+    // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
     return true;
   }
@@ -138,7 +170,7 @@ char Flatten::ID = 0;
 static RegisterPass<Flatten> X("flatten", "Flatten function control flow",
                                false, false);
 
-  // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
+// http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
