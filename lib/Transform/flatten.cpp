@@ -147,6 +147,7 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
+    DEBUG(F.viewCFG());
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
     for (auto block : blocks) {
@@ -164,7 +165,7 @@ struct Flatten : public FunctionPass {
     BasicBlock *initialBlock;
     // Going to have to split the entry block into 2 blocks
     if (entryBlock.getTerminator()->getNumSuccessors() > 1) {
-      DEBUG(errs() << "\tFSplitting entry block\n");
+      DEBUG(errs() << "\tSplitting entry block\n");
       initialBlock = entryBlock.splitBasicBlock(entryBlock.getTerminator());
       blocks.push_back(initialBlock);
     } else {
@@ -247,18 +248,21 @@ struct Flatten : public FunctionPass {
               branch->getCondition(), trueIndex, falseIndex, "", terminator);
 
           jumpIndex->addIncoming(select, block);
+
+          terminator->eraseFromParent();
+          BranchInst::Create(jumpBlock, block);
         } else if (InvokeInst *invoke = dyn_cast<InvokeInst>(terminator)) {
           // InvokeInst
           DEBUG(errs() << "\t\tInvoke Terminator\n");
           Value *destination =
               findBlock(context, blocks, invoke->getNormalDest());
-          jumpIndex->addIncoming(destination, block);
+          BasicBlock *newDestination = BasicBlock::Create(context, "", &F);
+          invoke->setNormalDest(newDestination);
+          jumpIndex->addIncoming(destination, newDestination);
+          BranchInst::Create(jumpBlock, newDestination);
         } else {
           llvm_unreachable("Unexpected TerminatorInst encountered!");
         }
-
-        terminator->eraseFromParent();
-        BranchInst::Create(jumpBlock, block);
       }
 
       // Add to jump table
@@ -283,7 +287,7 @@ struct Flatten : public FunctionPass {
             BasicBlock *userBlock = userInst->getParent();
             if (userBlock == jumpBlock) {
               phi = dyn_cast<PHINode>(userInst);
-              if (phi  && phi != jumpIndex) {
+              if (phi && phi != jumpIndex) {
                 isUsed = true;
                 break;
               }
