@@ -52,17 +52,17 @@
 using namespace llvm;
 
 static cl::list<std::string>
-    bcfFunc("bcfFunc", cl::CommaSeparated,
-            cl::desc("Insert Bogus Control Flow only for some functions: "
-                     "bcfFunc=\"func1,func2\""));
+bcfFunc("bcfFunc", cl::CommaSeparated,
+        cl::desc("Insert Bogus Control Flow only for some functions: "
+                 "bcfFunc=\"func1,func2\""));
 
 static cl::opt<double>
-    bcfProbability("bcfProbability", cl::init(0.5),
-                   cl::desc("Probability that a basic block will be split"));
+bcfProbability("bcfProbability", cl::init(0.5),
+               cl::desc("Probability that a basic block will be split"));
 
-static cl::opt<std::string> bcfSeed(
-    "bcfSeed", cl::init(""),
-    cl::desc("Seed for random number generator. Defaults to system time"));
+static cl::opt<std::string>
+bcfSeed("bcfSeed", cl::init(""),
+        cl::desc("Seed for random number generator. Defaults to system time"));
 
 static cl::opt<unsigned> bcfGlobal(
     "bcfGlobal", cl::init(4),
@@ -113,6 +113,10 @@ struct BogusCF : public FunctionPass {
     if (F.isDeclaration()) {
       return false;
     }
+    if (bcfProbability == 0.f) {
+      return false;
+    }
+
     DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
 
     auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
@@ -133,9 +137,7 @@ struct BogusCF : public FunctionPass {
     DEBUG(errs() << "\tListing and filtering blocks\n");
     // Get original list of blocks
     for (auto &block : F) {
-      DEBUG(if (!block.hasName()) {
-        block.setName(blockPrefix + Twine(i++));
-      });
+      DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
 
       DEBUG(errs() << "\tBlock " << block.getName() << "\n");
       BasicBlock::iterator inst1 = block.begin();
@@ -393,14 +395,13 @@ struct BogusCF : public FunctionPass {
           terminator->eraseFromParent();
           fcmp->eraseFromParent();
 
-          OpaquePredicate::PredicateType type = OpaquePredicate::create(
-              &block, trueBlock, falseBlock, globals, [&]{
-            return distribution(engine);
-          },
-              [&]()->OpaquePredicate::PredicateType{
-            return static_cast<OpaquePredicate::PredicateType>(
-                distributionType(engine));
-          });
+          OpaquePredicate::PredicateType type =
+              OpaquePredicate::create(&block, trueBlock, falseBlock, globals,
+                                      [&] { return distribution(engine); },
+                                      [&]()->OpaquePredicate::PredicateType {
+                return static_cast<OpaquePredicate::PredicateType>(
+                    distributionType(engine));
+              });
           DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
         }
       }
@@ -417,10 +418,9 @@ struct BogusCF : public FunctionPass {
 
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
-    X("boguscf", "Insert bogus control flow paths into basic blocks", false,
-      false);
+X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
 
-  // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
+// http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {

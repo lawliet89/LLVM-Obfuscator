@@ -11,12 +11,15 @@
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/Dominators.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -108,6 +111,26 @@ struct Flatten : public FunctionPass {
       if (block.getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block.getFirstNonPHIOrDbgOrLifetime();
       }
+
+      if (isa<IndirectBrInst>(block.getTerminator())) {
+        // TODO Maybe handle this
+        DEBUG(errs() << "\tSkipping function -- IndirectBrInst encountered\n");
+        return false;
+      }
+
+      if (isa<SwitchInst>(block.getTerminator())) {
+        // TODO Maybe handle this
+        DEBUG(errs() << "\tSkipping function -- SwitchInst encountered\n");
+        return false;
+      }
+
+      // LLVM does not support PHINodes for Invoke Edges
+      if (isa<InvokeInst>(block.getTerminator())) {
+        // TODO Maybe handle this
+        DEBUG(errs() << "\tSkipping function -- InvokeInst encountered\n");
+        return false;
+      }
+
       if (block.isLandingPad()) {
         DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
         continue;
@@ -115,18 +138,6 @@ struct Flatten : public FunctionPass {
       if (&block == &F.getEntryBlock()) {
         DEBUG(errs() << "\t\tSkipping: Entry block\n");
         continue;
-      }
-
-      if (isa<IndirectBrInst>(block.getTerminator())) {
-        // TODO Maybe handle this
-        DEBUG(errs() << "\tSkipping function -- IndirectBrInst encountered");
-        return false;
-      }
-
-      if (isa<SwitchInst>(block.getTerminator())) {
-        // TODO Maybe handle this
-        DEBUG(errs() << "\tSkipping function -- SwitchInst encountered");
-        return false;
       }
 
       DEBUG(errs() << "\t\tAdding block\n");
@@ -147,7 +158,7 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
-    DEBUG(F.viewCFG());
+    // DEBUG(F.viewCFG());
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
     for (auto block : blocks) {
@@ -166,7 +177,7 @@ struct Flatten : public FunctionPass {
     // Going to have to split the entry block into 2 blocks
     if (entryBlock.getTerminator()->getNumSuccessors() > 1) {
       DEBUG(errs() << "\tSplitting entry block\n");
-      initialBlock = entryBlock.splitBasicBlock(entryBlock.getTerminator());
+      initialBlock = SplitBlock(&entryBlock, entryBlock.getTerminator(), this);
       blocks.push_back(initialBlock);
     } else {
       initialBlock = entryBlock.getTerminator()->getSuccessor(0);
@@ -251,6 +262,7 @@ struct Flatten : public FunctionPass {
 
           terminator->eraseFromParent();
           BranchInst::Create(jumpBlock, block);
+#if 0
         } else if (InvokeInst *invoke = dyn_cast<InvokeInst>(terminator)) {
           // InvokeInst
           DEBUG(errs() << "\t\tInvoke Terminator\n");
@@ -260,7 +272,10 @@ struct Flatten : public FunctionPass {
           invoke->setNormalDest(newDestination);
           jumpIndex->addIncoming(destination, newDestination);
           BranchInst::Create(jumpBlock, newDestination);
+#endif
         } else {
+          DEBUG(errs() << terminator->getOpcodeName()
+                       << " type of TerminatorInst encountered \n");
           llvm_unreachable("Unexpected TerminatorInst encountered!");
         }
       }
@@ -316,6 +331,7 @@ struct Flatten : public FunctionPass {
     assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
 
+#if 0
     for (auto inst = jumpBlock->begin(), instEnd = jumpBlock->end();
          inst != instEnd; ++inst) {
       PHINode *phi = dyn_cast<PHINode>((Instruction *)inst);
@@ -332,16 +348,34 @@ struct Flatten : public FunctionPass {
         }
       }
     }
-
-    DEBUG(F.viewCFG());
-    // DEBUG_WITH_TYPE("cfg", F.viewCFG());
+#endif
+#if 0
+    std::vector<AllocaInst *> allocas;
+    // Promote memory to reg/PHI
+    for (Instruction &inst : F.getEntryBlock()) {
+      if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
+        if (isAllocaPromotable(alloca))
+          allocas.push_back(alloca);
+      }
+    }
+    if (!allocas.empty()) {
+      DEBUG(errs() << "\tPromoting memory to register\n");
+      DominatorTree &DT = getAnalysis<DominatorTree>();
+      DT.verifyDomTree();
+      PromoteMemToReg(allocas, DT);
+    }
+#endif
+    // DEBUG(F.viewCFG());
+    DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
     return true;
   }
 
   // Finalisation will add the necessary opaque predicates
   // virtual bool doFinalization(Module &M) { return false; }
-  // virtual void getAnalysisUsage(AnalysisUsage &Info) const {}
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<DominatorTree>();
+  }
 };
 }
 
