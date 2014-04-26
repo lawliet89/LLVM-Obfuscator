@@ -159,6 +159,8 @@ struct Flatten : public FunctionPass {
     }
 
     DEBUG(F.viewCFG());
+
+#if 0
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
     for (auto block : blocks) {
@@ -172,6 +174,7 @@ struct Flatten : public FunctionPass {
         DemotePHIToStack(phiInst);
       }
     }
+#endif
 
     BasicBlock *initialBlock;
     // Going to have to split the entry block into 2 blocks
@@ -287,6 +290,18 @@ struct Flatten : public FunctionPass {
 
       indirectBranch->addDestination(block);
 
+      // Move all PHI Nodes to jumpBlock
+      std::vector<PHINode *> movePHIs;
+      for (auto &inst : *block) {
+        if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
+          movePHIs.push_back(phi);
+        }
+      }
+
+      for (auto phi : movePHIs) {
+        phi->moveBefore(jumpBlock->begin());
+      }
+
       if (hasSuccessor) {
         DEBUG(errs() << "\t\tHandling successor use\n");
         for (auto &inst : *block) {
@@ -314,6 +329,7 @@ struct Flatten : public FunctionPass {
             }
           }
           if (isUsed && !phi) {
+            DEBUG(errs() << "\t\t\t\tCreating PHI Node\n");
             phi = jumpBuilder.CreatePHI(inst.getType(), users.size(), "");
             phi->moveBefore(jumpBlock->begin());
           }
@@ -322,7 +338,7 @@ struct Flatten : public FunctionPass {
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
-            DemotePHIToStack(phi);
+            // DemotePHIToStack(phi);
           }
         }
       }
@@ -382,11 +398,9 @@ struct Flatten : public FunctionPass {
 char Flatten::ID = 0;
 static RegisterPass<Flatten> X("flatten", "Flatten function control flow",
                                false, false);
-#if 0
 // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
   PM.add(new Flatten());
 });
-#endif
