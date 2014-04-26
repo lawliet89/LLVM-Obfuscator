@@ -19,11 +19,11 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/User.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -49,8 +49,9 @@ namespace {
 struct Flatten : public FunctionPass {
   static char ID;
   std::minstd_rand engine;
+  StringRef metaKindName;
 
-  Flatten() : FunctionPass(ID) {}
+  Flatten() : FunctionPass(ID), metaKindName("FlattenSwitch") {}
 
   inline Value *findBlock(LLVMContext &context,
                           std::vector<BasicBlock *> &blocks,
@@ -158,6 +159,10 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
+    MDNode *metaNode =
+        MDNode::get(context, MDString::get(context, metaKindName));
+    unsigned metaKind = context.getMDKindID(metaKindName);
+
     DEBUG(F.viewCFG());
 
 #if 0
@@ -228,6 +233,7 @@ struct Flatten : public FunctionPass {
 #endif
     SwitchInst *switchInst =
         jumpBuilder.CreateSwitch(jumpIndex, initialBlock, blocks.size());
+    switchInst->setMetadata(metaKind, metaNode);
 
     for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
       BasicBlock *block = blocks[i];
@@ -357,7 +363,7 @@ struct Flatten : public FunctionPass {
       }
     }
 
-    //assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
+    // assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
 
     // Iterate through PHINodes of jumpBlock and assign NULL values or other
