@@ -158,7 +158,7 @@ struct Flatten : public FunctionPass {
       return false;
     }
 
-    // DEBUG(F.viewCFG());
+    DEBUG(F.viewCFG());
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
     for (auto block : blocks) {
@@ -365,8 +365,8 @@ struct Flatten : public FunctionPass {
       PromoteMemToReg(allocas, DT);
     }
 #endif
-    // DEBUG(F.viewCFG());
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+    DEBUG(F.viewCFG());
+    // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
     return true;
   }
@@ -382,10 +382,11 @@ struct Flatten : public FunctionPass {
 char Flatten::ID = 0;
 static RegisterPass<Flatten> X("flatten", "Flatten function control flow",
                                false, false);
-
+#if 0
 // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
   PM.add(new Flatten());
 });
+#endif
