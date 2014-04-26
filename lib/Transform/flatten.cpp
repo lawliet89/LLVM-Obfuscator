@@ -214,12 +214,15 @@ struct Flatten : public FunctionPass {
         Type::getInt8PtrTy(context), jumpTableSize, jumpTableName);
 
     // Create indirect branch
+    Twine jumpAddrPtrName("");
+    DEBUG(jumpAddrPtrName = jumpAddrPtrName.concat("jump_addr_ptr"));
+    Value *jumpAddressPtr =
+        jumpBuilder.CreateGEP(jumpTable, jumpIndex, jumpAddrPtrName);
     Twine jumpAddrName("");
     DEBUG(jumpAddrName = jumpAddrName.concat("jump_addr"));
-    Value *jumpAddress =
-        jumpBuilder.CreateGEP(jumpTable, jumpIndex, jumpAddrName);
+    Value *jumpAddr = jumpBuilder.CreateLoad(jumpAddressPtr, jumpAddrName);
     IndirectBrInst *indirectBranch =
-        jumpBuilder.CreateIndirectBr(jumpAddress, blocks.size());
+        jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
     assert(indirectBranch && "IndirectBranchInst cannot be null!");
 
     for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
@@ -381,6 +384,27 @@ struct Flatten : public FunctionPass {
       PromoteMemToReg(allocas, DT);
     }
 #endif
+    // Iterate through PHINodes of jumpBlock and assign NULL values or other
+    // necessary incoming
+    for (auto &inst : *jumpBlock) {
+      if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
+        // Handle entryBlock
+        if (phi->getBasicBlockIndex(&entryBlock) == -1) {
+          // Set to null
+          Value *nullValue = Constant::getNullValue(phi->getType());
+          phi->addIncoming(nullValue, &entryBlock);
+        }
+
+        // All other blocks
+        for (auto block : blocks) {
+          if (phi->getBasicBlockIndex(block) == -1 &&
+              block->getTerminator()->getNumSuccessors() > 0) {
+            phi->addIncoming(phi, block);
+          }
+        }
+      }
+    }
+
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
