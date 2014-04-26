@@ -204,6 +204,7 @@ struct Flatten : public FunctionPass {
     PHINode *jumpIndex = jumpBuilder.CreatePHI(
         Type::getInt32Ty(context), blocks.size() + 1, jumpIndexName);
 
+#if 0
     DEBUG(errs() << "\tCreating jump table:\n");
 
     Twine jumpTableName("");
@@ -217,19 +218,26 @@ struct Flatten : public FunctionPass {
     Twine jumpAddrPtrName("");
     DEBUG(jumpAddrPtrName = jumpAddrPtrName.concat("jump_addr_ptr"));
     Value *jumpAddressPtr =
-        jumpBuilder.CreateGEP(jumpTable, jumpIndex, jumpAddrPtrName);
+        jumpBuilder.CreateInBoundsGEP(jumpTable, jumpIndex, jumpAddrPtrName);
     Twine jumpAddrName("");
     DEBUG(jumpAddrName = jumpAddrName.concat("jump_addr"));
-    Value *jumpAddr = jumpBuilder.CreateLoad(jumpAddressPtr, jumpAddrName);
+    LoadInst *jumpAddr = jumpBuilder.CreateLoad(jumpAddressPtr, jumpAddrName);
     IndirectBrInst *indirectBranch =
         jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
     assert(indirectBranch && "IndirectBranchInst cannot be null!");
+#endif
+    SwitchInst *switchInst =
+        jumpBuilder.CreateSwitch(jumpIndex, initialBlock, blocks.size());
 
     for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
       BasicBlock *block = blocks[i];
       assert(block != &entryBlock && "Entry block should not be processed!");
       DEBUG(errs() << "\t" << block->getName() << ":\n");
-      Value *index = ConstantInt::get(Type::getInt32Ty(context), i, false);
+      ConstantInt *index =
+          ConstantInt::get(Type::getInt32Ty(context), i, false);
+
+      // Using switch for now
+      switchInst->addCase(index, block);
 
       // Create jump index
       if (block == initialBlock) {
@@ -286,12 +294,14 @@ struct Flatten : public FunctionPass {
         }
       }
 
+#if 0
       // Add to jump table
-      Value *ptr = entryBuilder.CreateGEP(jumpTable, index);
+      Value *ptr = entryBuilder.CreateInBoundsGEP(jumpTable, index);
       BlockAddress *blockAddress = BlockAddress::get(block);
       entryBuilder.CreateStore((Value *)blockAddress, ptr);
 
       indirectBranch->addDestination(block);
+#endif
 
       // Move all PHI Nodes to jumpBlock
       std::vector<PHINode *> movePHIs;
@@ -347,43 +357,9 @@ struct Flatten : public FunctionPass {
       }
     }
 
-    assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
+    //assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
     entryBuilder.CreateBr(jumpBlock);
 
-#if 0
-    for (auto inst = jumpBlock->begin(), instEnd = jumpBlock->end();
-         inst != instEnd; ++inst) {
-      PHINode *phi = dyn_cast<PHINode>((Instruction *)inst);
-      if (phi == jumpIndex)
-        continue;
-      if (!phi)
-        continue;
-      if ((Instruction *)inst == jumpBlock->getFirstNonPHIOrDbgOrLifetime())
-        break;
-      for (auto pred = pred_begin(jumpBlock), predEnd = pred_end(jumpBlock);
-           pred != predEnd; ++pred) {
-        if (phi->getBasicBlockIndex(*pred) == -1) {
-          phi->addIncoming(phi, *pred);
-        }
-      }
-    }
-#endif
-#if 0
-    std::vector<AllocaInst *> allocas;
-    // Promote memory to reg/PHI
-    for (Instruction &inst : F.getEntryBlock()) {
-      if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
-        if (isAllocaPromotable(alloca))
-          allocas.push_back(alloca);
-      }
-    }
-    if (!allocas.empty()) {
-      DEBUG(errs() << "\tPromoting memory to register\n");
-      DominatorTree &DT = getAnalysis<DominatorTree>();
-      DT.verifyDomTree();
-      PromoteMemToReg(allocas, DT);
-    }
-#endif
     // Iterate through PHINodes of jumpBlock and assign NULL values or other
     // necessary incoming
     for (auto &inst : *jumpBlock) {
