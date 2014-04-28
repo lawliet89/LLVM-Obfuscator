@@ -32,6 +32,8 @@
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
+// The next include file is moved > version 3.4
+#include "llvm/Analysis/Dominators.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -39,6 +41,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/User.h"
 #include "llvm/Support/CommandLine.h"
@@ -46,6 +49,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include <algorithm>
 #include <vector>
 #include <chrono>
@@ -142,6 +146,7 @@ struct BogusCF : public FunctionPass {
     Twine blockPrefix = "block_";
     unsigned i = 0;
     DEBUG(errs() << "\tListing and filtering blocks\n");
+    BasicBlock &entryBlock = F.getEntryBlock();
     // Get original list of blocks
     for (auto &block : F) {
       DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
@@ -163,6 +168,13 @@ struct BogusCF : public FunctionPass {
         ++NumBlocksSkipped;
         continue;
       }
+
+      if (&block == &entryBlock) {
+        DEBUG(errs() << "\t\tSkipping: Entry block\n");
+        ++NumBlocksSkipped;
+        continue;
+      }
+
       DEBUG(errs() << "\t\tAdding block\n");
       blocks.push_back(&block);
     }
@@ -462,14 +474,34 @@ struct BogusCF : public FunctionPass {
           DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
         }
       }
+
       if (functionHasBlock) {
-        DEBUG_WITH_TYPE("boguscf", function.viewCFG());
+        DEBUG(errs() << "\tPromoting allocas to registers\n");
+        // Promote alloca to registers
+        std::vector<AllocaInst *> allocas;
+        BasicBlock &entryBlock = function.getEntryBlock();
+        for (Instruction &inst : entryBlock) {
+          if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
+            if (isAllocaPromotable(alloca)) {
+              allocas.push_back(alloca);
+            }
+          }
+        }
+
+        // Build dominator tree
+        DominatorTree &DT = getAnalysis<DominatorTree>();
+        DT.getBase().recalculate(function);
+        PromoteMemToReg(allocas, DT);
+
+        DEBUG_WITH_TYPE("cfg", function.viewCFG());
       }
     }
 
     return true;
   }
-  virtual void getAnalysisUsage(AnalysisUsage &Info) const {}
+  virtual void getAnalysisUsage(AnalysisUsage &Info) const {
+    Info.addRequired<DominatorTree>();
+  }
 };
 }
 
