@@ -28,6 +28,7 @@
 
 #define DEBUG_TYPE "boguscf"
 #include "Transform/opaque_predicate.h"
+#include "Transform/obf_utilities.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
@@ -118,6 +119,10 @@ struct BogusCF : public FunctionPass {
     }
 
     DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
+
+    if (ObfUtils::checkFunctionTagged(F)) {
+      DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
+    }
 
     auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
     if (bcfFunc.size() != 0 &&
@@ -353,6 +358,8 @@ struct BogusCF : public FunctionPass {
       hasBeenModified |= true;
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
+    if (hasBeenModified)
+      ObfUtils::tagFunction(F);
     return hasBeenModified;
   }
 

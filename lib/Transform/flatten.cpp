@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 // http://ac.inf.elte.hu/Vol_030_2009/003.pdf
 #define DEBUG_TYPE "flatten"
+#include "Transform/obf_utilities.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
@@ -84,7 +85,12 @@ struct Flatten : public FunctionPass {
     if (F.isDeclaration()) {
       return false;
     }
+
     DEBUG(errs() << "flatten: Function '" << F.getName() << "'\n");
+
+    if (ObfUtils::checkFunctionTagged(F)) {
+      DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
+    }
 
     // Check if function is requested
     auto funcListStart = flattenFunc.begin(), funcListEnd = flattenFunc.end();
@@ -391,6 +397,7 @@ struct Flatten : public FunctionPass {
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
+    ObfUtils::tagFunction(F);
     return true;
   }
 #if 0
