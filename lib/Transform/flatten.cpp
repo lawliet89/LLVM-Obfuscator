@@ -345,7 +345,6 @@ struct Flatten : public FunctionPass {
               phi = dyn_cast<PHINode>(userInst);
               if (phi && phi != jumpIndex) {
                 isUsed = true;
-                break;
               }
             } else if (userBlock != block) {
               isUsed = true;
