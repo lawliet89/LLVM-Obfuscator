@@ -45,6 +45,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include <algorithm>
 #include <vector>
 #include <chrono>
@@ -306,22 +307,30 @@ struct BogusCF : public FunctionPass {
           }
 
           if (usedNonPhi) {
-            DEBUG(errs() << "\t\t\t\t\tCreating PHI Node\n");
+            DEBUG(errs() << "\t\t\t\tCreating PHI Node\n");
             // If still not, then we will create in successor
             PHINode *phi =
                 PHINode::Create(inst.getType(), 2, "",
                                 successor->getFirstNonPHIOrDbgOrLifetime());
-                phiUsers.push_back(phi);
+            phiUsers.push_back(phi);
           }
+          DEBUG(errs() << "\t\t\t\tUpdating PHI Nodes\n");
           for (auto phi : phiUsers) {
+            DEBUG(errs() << "\t\t\t\t" << *phi << "\n");
             if (phi->getBasicBlockIndex(originalBlock) == -1)
               phi->addIncoming(&inst, originalBlock);
             if (phi->getBasicBlockIndex(copyBlock) == -1)
               phi->addIncoming(VMap[&inst], copyBlock);
+            DEBUG(errs() << "\t\t\t\t\tUpdating use\n");
             // Update users
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
+            DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
+            DemotePHIToStack(phi);
+#if 0
+            DEBUG(errs()
+                  << "\t\t\t\t\tAdding missing incomings for predecessors\n");
             // Add incoming phi nodes for all the successor's predecessors
             // to point to itself
             // This is because the Value was used not in a PHINode but from
@@ -332,11 +341,15 @@ struct BogusCF : public FunctionPass {
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
+              DEBUG(errs() << "\t\t\t\t\t\t" << (*pred)->getName()
+                             << "\n");
               if (*pred != originalBlock && *pred != copyBlock &&
                   phi->getBasicBlockIndex(*pred) == -1) {
+                DEBUG(errs() << "\t\t\t\t\t\t\tAdding\n");
                 phi->addIncoming(phi, *pred);
               }
             }
+#endif
           }
         }
 
