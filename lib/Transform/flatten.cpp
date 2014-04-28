@@ -360,7 +360,8 @@ struct Flatten : public FunctionPass {
             phi->moveBefore(jumpBlock->begin());
           }
           if (isUsed) {
-            phi->addIncoming(&inst, block);
+            if (phi->getBasicBlockIndex(block) == -1)
+              phi->addIncoming(&inst, block);
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
