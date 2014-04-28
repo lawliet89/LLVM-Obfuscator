@@ -238,9 +238,9 @@ struct BogusCF : public FunctionPass {
           DEBUG(errs() << "\t\t\t\t" << inst.getNumUses() << " Users\n");
           if (!inst.getNumUses())
             continue;
-          PHINode *phi = nullptr;
           std::vector<User *> users;
-          bool used = false;
+          std::vector<PHINode *> phiUsers;
+          bool used = false, usedNonPhi = false;
           // The instruction object itself is the Value for the result
           for (auto user = inst.use_begin(), useEnd = inst.use_end();
                user != useEnd; ++user) {
@@ -251,21 +251,22 @@ struct BogusCF : public FunctionPass {
             // Instruction belongs to another block that is not us
             if (userBlock != copyBlock && userBlock != originalBlock) {
               used = true;
-              DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
-                           << "\n");
+              DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName() << ": "
+                           << *userInst << "\n");
               // Find a PHI Node
               PHINode *phiCheck = dyn_cast<PHINode>(userInst);
               if (phiCheck) {
                 if (phiCheck->getParent() == successor) {
-                  assert(!phi && "> 1 successor PHI nodes use");
                   DEBUG(errs() << "\t\t\t\t\tSuccessor PHI Node\n");
-                  phi = phiCheck;
+                  phiUsers.push_back(phiCheck);
                 } else {
                   DEBUG(errs() << "\t\t\t\t\tNon-Successor PHI Node\n");
+                  usedNonPhi = true;
                   users.push_back(*user);
                 }
               } else {
                 DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
+                usedNonPhi = true;
                 users.push_back(*user);
               }
 #if 0
@@ -303,15 +304,16 @@ struct BogusCF : public FunctionPass {
             DEBUG(errs() << "\t\t\t\t\tNo use outside of basic block\n");
             continue;
           }
-          if (!phi) {
+
+          if (usedNonPhi) {
             DEBUG(errs() << "\t\t\t\t\tCreating PHI Node\n");
             // If still not, then we will create in successor
-            phi = PHINode::Create(inst.getType(), 2, "",
-                                  successor->getFirstNonPHIOrDbgOrLifetime());
+            PHINode *phi =
+                PHINode::Create(inst.getType(), 2, "",
+                                successor->getFirstNonPHIOrDbgOrLifetime());
+                phiUsers.push_back(phi);
           }
-
-          // If we have artificially created a PHINode
-          if (phi) {
+          for (auto phi : phiUsers) {
             if (phi->getBasicBlockIndex(originalBlock) == -1)
               phi->addIncoming(&inst, originalBlock);
             if (phi->getBasicBlockIndex(copyBlock) == -1)
