@@ -340,13 +340,14 @@ struct BogusCF : public FunctionPass {
             }
             DEBUG(errs()
                   << "\t\t\t\t\tAdding missing incomings for predecessors\n");
-            // Add incoming phi nodes for all the successor's predecessors
-            // to point to itself
-            // This is because the Value was used not in a PHINode but from
-            // our own created one, then the Value must have only been
-            // produced
-            // in the block that we just split. And thus not going to be
-            // changed
+// Add incoming phi nodes for all the successor's predecessors
+// to point to itself
+// This is because the Value was used not in a PHINode but from
+// our own created one, then the Value must have only been
+// produced
+// in the block that we just split. And thus not going to be
+// changed
+#if 0
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
@@ -357,6 +358,7 @@ struct BogusCF : public FunctionPass {
                 phi->addIncoming(phi, *pred);
               }
             }
+#endif
 
             DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
             DemotePHIToStack(phi);
@@ -504,7 +506,6 @@ struct BogusCF : public FunctionPass {
   }
 };
 }
-
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
 X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
