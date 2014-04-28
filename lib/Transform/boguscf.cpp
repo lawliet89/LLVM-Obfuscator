@@ -235,51 +235,87 @@ struct BogusCF : public FunctionPass {
         DEBUG(errs() << "\t\tHandling successor use\n");
         for (auto &inst : *originalBlock) {
           DEBUG(errs() << "\t\t\t" << inst << "\n");
+          DEBUG(errs() << "\t\t\t\t" << inst.getNumUses() << " Users\n");
+          if (!inst.getNumUses())
+            continue;
           PHINode *phi = nullptr;
           std::vector<User *> users;
+          bool used = false;
           // The instruction object itself is the Value for the result
           for (auto user = inst.use_begin(), useEnd = inst.use_end();
                user != useEnd; ++user) {
             // User is an instruction
-            if (Instruction *userInst = dyn_cast<Instruction>(*user)) {
-              BasicBlock *userBlock = userInst->getParent();
-              // Instruction belongs to another block that is not us
-              if (userBlock != copyBlock && userBlock != originalBlock) {
-                DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
-                             << "\n");
-                // Check if inst is a phinode in successor
-                // If it's not in a successor, it's the same as the else case
-                PHINode *phiCheck = dyn_cast<PHINode>(userInst);
-                if (phiCheck && phiCheck->getParent() == successor) {
-                  DEBUG(errs() << "\t\t\t\t\tPHI Node\n");
-                  if (phiCheck->getBasicBlockIndex(originalBlock) != -1) {
-                    phiCheck->addIncoming(VMap[&inst], copyBlock);
-                  }
-                  break; // done with this instruction
+            Instruction *userInst = dyn_cast<Instruction>(*user);
+            assert(userInst && "User is not an instruction!");
+            BasicBlock *userBlock = userInst->getParent();
+            // Instruction belongs to another block that is not us
+            if (userBlock != copyBlock && userBlock != originalBlock) {
+              used = true;
+              DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName()
+                           << "\n");
+              // Find a PHI Node
+              PHINode *phiCheck = dyn_cast<PHINode>(userInst);
+              if (phiCheck) {
+                if (phiCheck->getParent() == successor) {
+                  assert(!phi && "> 1 successor PHI nodes use");
+                  DEBUG(errs() << "\t\t\t\t\tSuccessor PHI Node\n");
+                  phi = phiCheck;
                 } else {
-                  // This is an artificially created PHINode whose value will
-                  // always come from the "upper" blocks as originally
-                  // Might only happen in a loop
-                  // cf
-                  // http://llvm.org/docs/doxygen/html/classllvm_1_1LoopInfo.html
-                  DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
-                  if (!phi) {
-                    DEBUG_WITH_TYPE(
-                        "opt", errs() << "\t\t\t\t\t\tCreating PHI Node\n");
-                    // If still not, then we will create in successor
-                    phi = PHINode::Create(
-                        inst.getType(), 2, "",
-                        successor->getFirstNonPHIOrDbgOrLifetime());
-                    phi->addIncoming(&inst, originalBlock);
-                    phi->addIncoming(VMap[&inst], copyBlock);
-                  }
+                  DEBUG(errs() << "\t\t\t\t\tNon-Successor PHI Node\n");
                   users.push_back(*user);
                 }
+              } else {
+                DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
+                users.push_back(*user);
               }
+#if 0
+              // Check if inst is a phinode in successor
+              // If it's not in a successor, it's the same as the else case
+              PHINode *phiCheck = dyn_cast<PHINode>(userInst);
+              if (phiCheck && phiCheck->getParent() == successor) {
+                DEBUG(errs() << "\t\t\t\t\tPHI Node\n");
+                if (phiCheck->getBasicBlockIndex(originalBlock) != -1) {
+                  phiCheck->addIncoming(VMap[&inst], copyBlock);
+                }
+                // break;
+              } else {
+                // This is an artificially created PHINode whose value will
+                // always come from the "upper" blocks as originally
+                // Might only happen in a loop
+                // cf
+                // http://llvm.org/docs/doxygen/html/classllvm_1_1LoopInfo.html
+                DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
+                if (!phi) {
+                  DEBUG(errs() << "\t\t\t\t\t\tCreating PHI Node\n");
+                  // If still not, then we will create in successor
+                  phi = PHINode::Create(
+                      inst.getType(), 2, "",
+                      successor->getFirstNonPHIOrDbgOrLifetime());
+                  phi->addIncoming(&inst, originalBlock);
+
+                }
+                users.push_back(*user);
+              }
+#endif
             }
           }
+          if (!used) {
+            DEBUG(errs() << "\t\t\t\t\tNo use outside of basic block\n");
+            continue;
+          }
+          if (!phi) {
+            DEBUG(errs() << "\t\t\t\t\tCreating PHI Node\n");
+            // If still not, then we will create in successor
+            phi = PHINode::Create(inst.getType(), 2, "",
+                                  successor->getFirstNonPHIOrDbgOrLifetime());
+          }
+
           // If we have artificially created a PHINode
           if (phi) {
+            if (phi->getBasicBlockIndex(originalBlock) == -1)
+              phi->addIncoming(&inst, originalBlock);
+            if (phi->getBasicBlockIndex(copyBlock) == -1)
+              phi->addIncoming(VMap[&inst], copyBlock);
             // Update users
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
@@ -294,7 +330,8 @@ struct BogusCF : public FunctionPass {
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
-              if (*pred != originalBlock && *pred != copyBlock) {
+              if (*pred != originalBlock && *pred != copyBlock &&
+                  phi->getBasicBlockIndex(*pred) == -1) {
                 phi->addIncoming(phi, *pred);
               }
             }
@@ -355,7 +392,6 @@ struct BogusCF : public FunctionPass {
                                               (Value *)condition, block);
       branch->setMetadata(metaKind, metaNode);
 
-      DEBUG_WITH_TYPE("cfg", F.viewCFG());
       hasBeenModified |= true;
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
