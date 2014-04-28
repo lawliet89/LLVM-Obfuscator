@@ -22,6 +22,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/User.h"
@@ -392,12 +393,29 @@ struct Flatten : public FunctionPass {
 
     return true;
   }
+#if 0
+  // Replace switch with jump tables
+  virtual bool doFinalization(Module &M) {
+    bool modified = false;
+    DEBUG(errs() << "Finalising: Creating jump tables\n");
+    LLVMContext &context = M.getContext();
+    unsigned metaKind = context.getMDKindID(metaKindName);
+    for (auto &function : M) {
+      DEBUG(errs() << "\tFunction " << function.getName() << "\n");
+      bool functionHasBlock = false;
+      for (auto &block : function) {
+        TerminatorInst *terminator = block.getTerminator();
+        if (terminator->getMetadata(metaKind)) {
+          functionHasBlock = true;
+          DEBUG(errs() << "\t\tJump block found\n");
+        }
+      }
+      modified |= functionHasBlock;
+    }
 
-  // Finalisation will add the necessary opaque predicates
-  // virtual bool doFinalization(Module &M) { return false; }
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<DominatorTree>();
+    return modified;
   }
+#endif
 };
 }
 
