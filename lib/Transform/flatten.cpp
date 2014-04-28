@@ -20,6 +20,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -395,6 +396,22 @@ struct Flatten : public FunctionPass {
       }
     }
 
+    // Promote allocas to register
+    DEBUG(errs() << "\tPromoting allocas to registers\n");
+    // Promote alloca to registers
+    std::vector<AllocaInst *> allocas;
+    for (Instruction &inst : entryBlock) {
+      if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
+        if (isAllocaPromotable(alloca)) {
+          allocas.push_back(alloca);
+        }
+      }
+    }
+
+    // Build dominator tree
+    DominatorTree &DT = getAnalysis<DominatorTree>();
+    DT.getBase().recalculate(F);
+    PromoteMemToReg(allocas, DT);
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
@@ -424,6 +441,9 @@ struct Flatten : public FunctionPass {
     return modified;
   }
 #endif
+  virtual void getAnalysisUsage(AnalysisUsage &Info) const {
+    Info.addRequired<DominatorTree>();
+  }
 };
 }
 
