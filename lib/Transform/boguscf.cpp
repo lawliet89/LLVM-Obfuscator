@@ -58,7 +58,7 @@ bcfFunc("bcfFunc", cl::CommaSeparated,
                  "bcfFunc=\"func1,func2\""));
 
 static cl::opt<double>
-bcfProbability("bcfProbability", cl::init(0.5),
+bcfProbability("bcfProbability", cl::init(0.2),
                cl::desc("Probability that a basic block will be split"));
 
 static cl::opt<std::string>
@@ -122,6 +122,7 @@ struct BogusCF : public FunctionPass {
 
     if (ObfUtils::checkFunctionTagged(F)) {
       DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
+      return false;
     }
 
     auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();

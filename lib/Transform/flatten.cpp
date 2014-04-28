@@ -90,6 +90,7 @@ struct Flatten : public FunctionPass {
 
     if (ObfUtils::checkFunctionTagged(F)) {
       DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
+      return false;
     }
 
     // Check if function is requested
@@ -172,7 +173,6 @@ struct Flatten : public FunctionPass {
 
     DEBUG(F.viewCFG());
 
-#if 0
     // Demote all the PHI Nodes to stack
     DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
     for (auto block : blocks) {
@@ -186,7 +186,6 @@ struct Flatten : public FunctionPass {
         DemotePHIToStack(phiInst);
       }
     }
-#endif
 
     BasicBlock *initialBlock;
     // Going to have to split the entry block into 2 blocks
@@ -316,6 +315,7 @@ struct Flatten : public FunctionPass {
       indirectBranch->addDestination(block);
 #endif
 
+#if 0
       // Move all PHI Nodes to jumpBlock
       std::vector<PHINode *> movePHIs;
       for (auto &inst : *block) {
@@ -327,6 +327,7 @@ struct Flatten : public FunctionPass {
       for (auto phi : movePHIs) {
         phi->moveBefore(jumpBlock->begin());
       }
+#endif
 
       if (hasSuccessor) {
         DEBUG(errs() << "\t\tHandling successor use\n");
