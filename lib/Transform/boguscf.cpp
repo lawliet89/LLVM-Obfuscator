@@ -326,9 +326,6 @@ struct BogusCF : public FunctionPass {
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
-            DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
-            DemotePHIToStack(phi);
-#if 0
             DEBUG(errs()
                   << "\t\t\t\t\tAdding missing incomings for predecessors\n");
             // Add incoming phi nodes for all the successor's predecessors
@@ -341,15 +338,16 @@ struct BogusCF : public FunctionPass {
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
-              DEBUG(errs() << "\t\t\t\t\t\t" << (*pred)->getName()
-                             << "\n");
+              DEBUG(errs() << "\t\t\t\t\t\t" << (*pred)->getName() << "\n");
               if (*pred != originalBlock && *pred != copyBlock &&
                   phi->getBasicBlockIndex(*pred) == -1) {
                 DEBUG(errs() << "\t\t\t\t\t\t\tAdding\n");
                 phi->addIncoming(phi, *pred);
               }
             }
-#endif
+
+            DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
+            DemotePHIToStack(phi);
           }
         }
 
@@ -465,7 +463,7 @@ struct BogusCF : public FunctionPass {
         }
       }
       if (functionHasBlock) {
-        DEBUG_WITH_TYPE("cfg", function.viewCFG());
+        DEBUG_WITH_TYPE("boguscf", function.viewCFG());
       }
     }
 
