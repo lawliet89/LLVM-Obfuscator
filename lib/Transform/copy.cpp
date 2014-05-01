@@ -111,6 +111,9 @@ bool Copy::runOnModule(Module &M) {
     }
     SmallVector<ReturnInst *, 8> Returns; // Ignore returns cloned.
     CloneFunctionInto(clone, F, VMap, true, Returns);
+
+    // Tag function
+    ObfUtils::tagFunction(*clone, ObfUtils::CopyObf);
   }
 
   return hasBeenModified;

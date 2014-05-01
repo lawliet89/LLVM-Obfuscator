@@ -18,6 +18,7 @@ using namespace llvm;
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
+  PM.add(new Copy());
   PM.add(new Flatten());
   PM.add(new BogusCF());
 });
