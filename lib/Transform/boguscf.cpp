@@ -179,7 +179,7 @@ bool BogusCF::runOnFunction(Function &F) {
   NumBlocksSeen += blocks.size();
   DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
   if (blocks.empty()) {
-    return false;
+    return hasBeenModified;
   }
 
   DEBUG(errs() << "\tDemoting PHI instructions to allocas\n");
