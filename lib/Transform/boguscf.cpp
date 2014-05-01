@@ -538,6 +538,7 @@ char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
 X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
 
+// TODO: Optimise the scheduling of these passes
 // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
