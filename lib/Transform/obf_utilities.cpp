@@ -32,6 +32,8 @@ void tagFunction(Function &F) {
 
 // Check if a function has been tagged as obfuscated
 bool checkFunctionTagged(Function &F) {
+  return false; // debugging
+
   LLVMContext &context = F.getContext();
   unsigned metaKind = context.getMDKindID(metaKindName);
   // Get first instruction

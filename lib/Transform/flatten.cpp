@@ -418,6 +418,8 @@ struct Flatten : public FunctionPass {
     ObfUtils::tagFunction(F);
     return true;
   }
+
+  // TODO: Use jump tables
 #if 0
   // Replace switch with jump tables
   virtual bool doFinalization(Module &M) {
