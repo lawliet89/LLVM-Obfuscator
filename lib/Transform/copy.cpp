@@ -114,6 +114,8 @@ bool Copy::runOnModule(Module &M) {
 
     // Tag function
     ObfUtils::tagFunction(*clone, ObfUtils::CopyObf);
+
+    // TODO: find users and maybe use opaque predicates to use clone?
   }
 
   return hasBeenModified;
