@@ -11,6 +11,8 @@
 
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
+#include <random>
+
 using namespace llvm;
 
 struct BogusCF : public FunctionPass {

@@ -6,6 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+#include "Transform/copy.h"
 #include "Transform/flatten.h"
 #include "Transform/boguscf.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"

@@ -23,6 +23,8 @@ StringRef getMetaKindName(ObfUtils::ObfType type) {
     return StringRef("obf_boguscf");
   case ObfUtils::FlattenObf:
     return StringRef("obf_flatten");
+  case ObfUtils::CopyObf:
+    return StringRef("obf_copy");
   default:
     llvm_unreachable("Unknown obfuscation type");
   }

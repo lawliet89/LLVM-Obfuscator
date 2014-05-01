@@ -19,7 +19,8 @@ using namespace llvm;
 namespace ObfUtils {
   enum ObfType {
     BogusCFObf,
-    FlattenObf
+    FlattenObf,
+    CopyObf
   };
 
   // Tag a function as "obfuscated" - this can be useful for mutually exclusive

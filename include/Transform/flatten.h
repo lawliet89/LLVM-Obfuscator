@@ -13,6 +13,7 @@
 #include "llvm/PassManager.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
+#include <random>
 
 using namespace llvm;
 

@@ -31,7 +31,6 @@
 #include "Transform/opaque_predicate.h"
 #include "Transform/obf_utilities.h"
 #include "llvm/ADT/Statistic.h"
-// The next include file is moved > version 3.4
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -49,7 +48,6 @@
 #include <algorithm>
 #include <vector>
 #include <chrono>
-#include <random>
 
 static cl::list<std::string>
 bcfFunc("bcfFunc", cl::CommaSeparated,
