@@ -150,7 +150,10 @@ struct BogusCF : public FunctionPass {
     BasicBlock &entryBlock = F.getEntryBlock();
     // Get original list of blocks
     for (auto &block : F) {
-      DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
+      DEBUG(if (!block.hasName()) {
+                  block.setName(blockPrefix + Twine(i++));
+                  hasBeenModified |= true;
+                });
 
       DEBUG(errs() << "\tBlock " << block.getName() << "\n");
       for (auto &inst : block) {
@@ -164,6 +167,8 @@ struct BogusCF : public FunctionPass {
       }
       // We do not want to transform a basic block that is only involved with
       // terminator instruction or is a landing pad for an exception
+      // c.f.
+      // https://github.com/llvm-mirror/llvm/blob/release_34/lib/Transforms/Utils/DemoteRegToStack.cpp#L130
       if (isa<TerminatorInst>(inst1)) {
         DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
         ++NumBlocksSkipped;
@@ -179,6 +184,14 @@ struct BogusCF : public FunctionPass {
         DEBUG(errs() << "\t\tSkipping: Entry block\n");
         ++NumBlocksSkipped;
         continue;
+      }
+
+      // We skip functions with InvokeInst because PHI demotions are not
+      // supported with invoke edges by LLVM yet.
+      TerminatorInst *terminator = block.getTerminator();
+      if (isa<InvokeInst>(terminator)) {
+        DEBUG(errs() << "\tFunction has InvokeInst -- skipping\n");
+        return hasBeenModified;
       }
 
       DEBUG(errs() << "\t\tAdding block\n");
