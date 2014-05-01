@@ -13,16 +13,18 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
+#include <vector>
 
 namespace {
 StringRef getMetaKindName(ObfUtils::ObfType type) {
-  switch(type) {
-    case ObfUtils::BogusCFObf:
-      return StringRef("obf_boguscf");
-    case ObfUtils::FlattenObf:
-      return StringRef("obf_flatten");
-    default:
-      llvm_unreachable("Unknown obfuscation type");
+  switch (type) {
+  case ObfUtils::BogusCFObf:
+    return StringRef("obf_boguscf");
+  case ObfUtils::FlattenObf:
+    return StringRef("obf_flatten");
+  default:
+    llvm_unreachable("Unknown obfuscation type");
   }
 }
 };
@@ -48,5 +50,21 @@ bool checkFunctionTagged(Function &F, ObfType type) {
   // Get first instruction
   Instruction *first = (Instruction *)(F.getEntryBlock().begin());
   return bool(first->getMetadata(metaKind));
+}
+
+void promoteAllocas(Function &F, DominatorTree &DT) {
+  std::vector<AllocaInst *> allocas;
+  for (auto &block : F) {
+    for (Instruction &inst : block) {
+      if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
+        if (isAllocaPromotable(alloca)) {
+          allocas.push_back(alloca);
+        }
+      }
+    }
+  }
+
+  DT.getBase().recalculate(F);
+  PromoteMemToReg(allocas, DT);
 }
 };

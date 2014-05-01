@@ -27,13 +27,11 @@
 //  - Indeterminate opaque predicate
 
 #define DEBUG_TYPE "boguscf"
+#include "Transform/boguscf.h"
 #include "Transform/opaque_predicate.h"
 #include "Transform/obf_utilities.h"
-#include "llvm/Pass.h"
-#include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 // The next include file is moved > version 3.4
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -49,13 +47,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
 #include "llvm/Transforms/Utils/Local.h"
-#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include <algorithm>
 #include <vector>
 #include <chrono>
 #include <random>
-
-using namespace llvm;
 
 static cl::list<std::string>
 bcfFunc("bcfFunc", cl::CommaSeparated,
@@ -80,228 +75,216 @@ STATISTIC(NumBlocksSkipped,
           "Number of blocks skipped due to PHI/terminator only blocks");
 STATISTIC(NumBlocksTransformed, "Number of basic blocks transformed");
 
-namespace {
-struct BogusCF : public FunctionPass {
-  static char ID;
-  std::minstd_rand engine;
-  std::bernoulli_distribution trial;
-  StringRef metaKindName;
+// Initialise and check options
+bool BogusCF::doInitialization(Module &M) {
+  if (bcfProbability < 0.f || bcfProbability > 1.f) {
+    LLVMContext &ctx = getGlobalContext();
+    ctx.emitError("BogusCF: Probability must be between 0 and 1");
+  }
 
-  BogusCF() : FunctionPass(ID), metaKindName("opaqueStub") {}
+  // Seed engine and create distribution
+  if (!bcfSeed.empty()) {
+    std::seed_seq seed(bcfSeed.begin(), bcfSeed.end());
+    engine.seed(seed);
+  } else {
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    engine.seed(seed);
+  }
 
-  // Initialise and check options
-  virtual bool doInitialization(Module &M) {
-    if (bcfProbability < 0.f || bcfProbability > 1.f) {
-      LLVMContext &ctx = getGlobalContext();
-      ctx.emitError("BogusCF: Probability must be between 0 and 1");
-    }
+  trial.param(std::bernoulli_distribution::param_type((double)bcfProbability));
 
-    // Seed engine and create distribution
-    if (!bcfSeed.empty()) {
-      std::seed_seq seed(bcfSeed.begin(), bcfSeed.end());
-      engine.seed(seed);
-    } else {
-      unsigned seed =
-          std::chrono::system_clock::now().time_since_epoch().count();
-      engine.seed(seed);
-    }
+  return false;
+}
 
-    trial.param(
-        std::bernoulli_distribution::param_type((double)bcfProbability));
-
+bool BogusCF::runOnFunction(Function &F) {
+  bool hasBeenModified = false;
+  // If the function is declared elsewhere in other translation unit
+  // we should not modify it here
+  if (F.isDeclaration()) {
+    return false;
+  }
+  if (bcfProbability == 0.f) {
     return false;
   }
 
-  virtual bool runOnFunction(Function &F) {
-    bool hasBeenModified = false;
-    // If the function is declared elsewhere in other translation unit
-    // we should not modify it here
-    if (F.isDeclaration()) {
-      return false;
+  DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
+
+  auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
+  if (bcfFunc.size() != 0 &&
+      std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
+    DEBUG(errs() << "\tFunction not requested -- skipping\n");
+    return false;
+  }
+
+  // Use a vector to store the list of blocks for probabilistic
+  // splitting into two bogus control flow for a later time
+  std::vector<BasicBlock *> blocks;
+  blocks.reserve(F.size());
+  std::vector<PHINode *> phis;
+
+  DEBUG(errs() << "\t" << F.size() << " basic blocks found\n");
+  Twine blockPrefix = "block_";
+  unsigned i = 0;
+  DEBUG(errs() << "\tListing and filtering blocks\n");
+  BasicBlock &entryBlock = F.getEntryBlock();
+  // Get original list of blocks
+  for (auto &block : F) {
+    DEBUG(if (!block.hasName()) {
+                block.setName(blockPrefix + Twine(i++));
+                hasBeenModified |= true;
+              });
+
+    DEBUG(errs() << "\tBlock " << block.getName() << "\n");
+    for (auto &inst : block) {
+      if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
+        phis.push_back(phi);
+      }
     }
-    if (bcfProbability == 0.f) {
-      return false;
+    BasicBlock::iterator inst1 = block.begin();
+    if (block.getFirstNonPHIOrDbgOrLifetime()) {
+      inst1 = block.getFirstNonPHIOrDbgOrLifetime();
     }
-
-    DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
-
-    auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
-    if (bcfFunc.size() != 0 &&
-        std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
-      DEBUG(errs() << "\tFunction not requested -- skipping\n");
-      return false;
+    // We do not want to transform a basic block that is only involved with
+    // terminator instruction or is a landing pad for an exception
+    // c.f.
+    // https://github.com/llvm-mirror/llvm/blob/release_34/lib/Transforms/Utils/DemoteRegToStack.cpp#L130
+    if (isa<TerminatorInst>(inst1)) {
+      DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
+      ++NumBlocksSkipped;
+      continue;
     }
-
-    // Use a vector to store the list of blocks for probabilistic
-    // splitting into two bogus control flow for a later time
-    std::vector<BasicBlock *> blocks;
-    blocks.reserve(F.size());
-    std::vector<PHINode *> phis;
-
-    DEBUG(errs() << "\t" << F.size() << " basic blocks found\n");
-    Twine blockPrefix = "block_";
-    unsigned i = 0;
-    DEBUG(errs() << "\tListing and filtering blocks\n");
-    BasicBlock &entryBlock = F.getEntryBlock();
-    // Get original list of blocks
-    for (auto &block : F) {
-      DEBUG(if (!block.hasName()) {
-                  block.setName(blockPrefix + Twine(i++));
-                  hasBeenModified |= true;
-                });
-
-      DEBUG(errs() << "\tBlock " << block.getName() << "\n");
-      for (auto &inst : block) {
-        if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
-          phis.push_back(phi);
-        }
-      }
-      BasicBlock::iterator inst1 = block.begin();
-      if (block.getFirstNonPHIOrDbgOrLifetime()) {
-        inst1 = block.getFirstNonPHIOrDbgOrLifetime();
-      }
-      // We do not want to transform a basic block that is only involved with
-      // terminator instruction or is a landing pad for an exception
-      // c.f.
-      // https://github.com/llvm-mirror/llvm/blob/release_34/lib/Transforms/Utils/DemoteRegToStack.cpp#L130
-      if (isa<TerminatorInst>(inst1)) {
-        DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
-        ++NumBlocksSkipped;
-        continue;
-      }
-      if (block.isLandingPad()) {
-        DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
-        ++NumBlocksSkipped;
-        continue;
-      }
-
-      if (&block == &entryBlock) {
-        DEBUG(errs() << "\t\tSkipping: Entry block\n");
-        ++NumBlocksSkipped;
-        continue;
-      }
-
-      // We skip functions with InvokeInst because PHI demotions are not
-      // supported with invoke edges by LLVM yet.
-      TerminatorInst *terminator = block.getTerminator();
-      if (isa<InvokeInst>(terminator)) {
-        DEBUG(errs() << "\tFunction has InvokeInst -- skipping\n");
-        return hasBeenModified;
-      }
-
-      DEBUG(errs() << "\t\tAdding block\n");
-      blocks.push_back(&block);
+    if (block.isLandingPad()) {
+      DEBUG(errs() << "\t\tSkipping: Landing pad block\n");
+      ++NumBlocksSkipped;
+      continue;
     }
 
-    NumBlocksSeen += blocks.size();
-    DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
-    if (blocks.empty()) {
-      return false;
+    if (&block == &entryBlock) {
+      DEBUG(errs() << "\t\tSkipping: Entry block\n");
+      ++NumBlocksSkipped;
+      continue;
     }
 
-    DEBUG(errs() << "\tDemoting PHI instructions to allocas\n");
-    for (auto phi : phis) {
-      DemotePHIToStack(phi);
+    // We skip functions with InvokeInst because PHI demotions are not
+    // supported with invoke edges by LLVM yet.
+    TerminatorInst *terminator = block.getTerminator();
+    if (isa<InvokeInst>(terminator)) {
+      DEBUG(errs() << "\tFunction has InvokeInst -- skipping\n");
+      return hasBeenModified;
     }
 
-    LLVMContext &context = F.getContext();
-    MDNode *metaNode =
-        MDNode::get(context, MDString::get(context, metaKindName));
-    unsigned metaKind = context.getMDKindID(metaKindName);
+    DEBUG(errs() << "\t\tAdding block\n");
+    blocks.push_back(&block);
+  }
 
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  NumBlocksSeen += blocks.size();
+  DEBUG(errs() << "\t" << blocks.size() << " basic blocks remaining\n");
+  if (blocks.empty()) {
+    return false;
+  }
 
-    trial.reset(); // Independent per function
-    DEBUG(errs() << "\tRandomly shuffling list of basic blocks\n");
-    std::random_shuffle(blocks.begin(), blocks.end());
+  DEBUG(errs() << "\tDemoting PHI instructions to allocas\n");
+  for (auto phi : phis) {
+    DemotePHIToStack(phi);
+  }
 
-    for (BasicBlock *block : blocks) {
-      DEBUG(errs() << "\tBlock " << block->getName() << "\n");
+  LLVMContext &context = F.getContext();
+  MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
+  unsigned metaKind = context.getMDKindID(metaKindName);
 
-      BasicBlock::iterator inst1 = block->begin();
-      if (block->getFirstNonPHIOrDbgOrLifetime()) {
-        inst1 = block->getFirstNonPHIOrDbgOrLifetime();
-      }
+  DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
-      // Now let's decide if we want to transform this block or not
-      if (!trial(engine)) {
-        DEBUG(errs() << "\t\tSkipping: Bernoulli trial failed\n");
-        continue;
-      }
+  trial.reset(); // Independent per function
+  DEBUG(errs() << "\tRandomly shuffling list of basic blocks\n");
+  std::random_shuffle(blocks.begin(), blocks.end());
 
-      ++NumBlocksTransformed;
-      auto terminator = block->getTerminator();
-      bool hasSuccessors = terminator->getNumSuccessors() > 0;
+  for (BasicBlock *block : blocks) {
+    DEBUG(errs() << "\tBlock " << block->getName() << "\n");
 
-      BasicBlock *successor = nullptr;
-      // If this block has > 1 successors, we need to create a "successor"
-      // block to be the joiner block that contains the necessary PHI nodes
-      // Will be handled as per normal later on
-      if (hasSuccessors && terminator->getNumSuccessors() > 1) {
-        DEBUG(errs() << "\t\t>1 successor: Creating successor block\n");
-        successor = block->splitBasicBlock(terminator);
-        DEBUG(successor->setName(block->getName() + "_successor"));
+    BasicBlock::iterator inst1 = block->begin();
+    if (block->getFirstNonPHIOrDbgOrLifetime()) {
+      inst1 = block->getFirstNonPHIOrDbgOrLifetime();
+    }
 
-      } else if (hasSuccessors) {
-        successor = *succ_begin(block);
-      }
+    // Now let's decide if we want to transform this block or not
+    if (!trial(engine)) {
+      DEBUG(errs() << "\t\tSkipping: Bernoulli trial failed\n");
+      continue;
+    }
 
-      DEBUG(errs() << "\t\tSplitting Basic Block\n");
-      BasicBlock *originalBlock = block->splitBasicBlock(inst1);
-      DEBUG(originalBlock->setName(block->getName() + "_original"));
-      DEBUG(errs() << "\t\tCloning Basic Block\n");
-      Twine prefix = "Cloned";
-      ValueToValueMapTy VMap;
-      BasicBlock *copyBlock = CloneBasicBlock(originalBlock, VMap, prefix, &F);
-      DEBUG(copyBlock->setName(block->getName() + "_cloned"));
+    ++NumBlocksTransformed;
+    auto terminator = block->getTerminator();
+    bool hasSuccessors = terminator->getNumSuccessors() > 0;
 
-      // Remap operands, phi nodes, and metadata
-      DEBUG(errs() << "\t\tRemapping information\n");
+    BasicBlock *successor = nullptr;
+    // If this block has > 1 successors, we need to create a "successor"
+    // block to be the joiner block that contains the necessary PHI nodes
+    // Will be handled as per normal later on
+    if (hasSuccessors && terminator->getNumSuccessors() > 1) {
+      DEBUG(errs() << "\t\t>1 successor: Creating successor block\n");
+      successor = block->splitBasicBlock(terminator);
+      DEBUG(successor->setName(block->getName() + "_successor"));
 
-      for (auto &inst : *copyBlock) {
-        RemapInstruction(&inst, VMap, RF_IgnoreMissingEntries);
-      }
+    } else if (hasSuccessors) {
+      successor = *succ_begin(block);
+    }
 
-      // If this block has a successor, we need to worry about use of Values
-      // generated by this block
-      if (successor) {
-        DEBUG(errs() << "\t\tHandling successor use\n");
-        for (auto &inst : *originalBlock) {
-          DEBUG(errs() << "\t\t\t" << inst << "\n");
-          DEBUG(errs() << "\t\t\t\t" << inst.getNumUses() << " Users\n");
-          if (!inst.getNumUses())
-            continue;
-          std::vector<User *> users;
-          std::vector<PHINode *> phiUsers;
-          bool used = false, usedNonPhi = false;
-          // The instruction object itself is the Value for the result
-          for (auto user = inst.use_begin(), useEnd = inst.use_end();
-               user != useEnd; ++user) {
-            // User is an instruction
-            Instruction *userInst = dyn_cast<Instruction>(*user);
-            assert(userInst && "User is not an instruction!");
-            BasicBlock *userBlock = userInst->getParent();
-            // Instruction belongs to another block that is not us
-            if (userBlock != copyBlock && userBlock != originalBlock) {
-              used = true;
-              DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName() << ": "
-                           << *userInst << "\n");
-              // Find a PHI Node
-              PHINode *phiCheck = dyn_cast<PHINode>(userInst);
-              if (phiCheck) {
-                if (phiCheck->getParent() == successor) {
-                  DEBUG(errs() << "\t\t\t\t\tSuccessor PHI Node\n");
-                  phiUsers.push_back(phiCheck);
-                } else {
-                  DEBUG(errs() << "\t\t\t\t\tNon-Successor PHI Node\n");
-                  usedNonPhi = true;
-                  users.push_back(*user);
-                }
+    DEBUG(errs() << "\t\tSplitting Basic Block\n");
+    BasicBlock *originalBlock = block->splitBasicBlock(inst1);
+    DEBUG(originalBlock->setName(block->getName() + "_original"));
+    DEBUG(errs() << "\t\tCloning Basic Block\n");
+    Twine prefix = "Cloned";
+    ValueToValueMapTy VMap;
+    BasicBlock *copyBlock = CloneBasicBlock(originalBlock, VMap, prefix, &F);
+    DEBUG(copyBlock->setName(block->getName() + "_cloned"));
+
+    // Remap operands, phi nodes, and metadata
+    DEBUG(errs() << "\t\tRemapping information\n");
+
+    for (auto &inst : *copyBlock) {
+      RemapInstruction(&inst, VMap, RF_IgnoreMissingEntries);
+    }
+
+    // If this block has a successor, we need to worry about use of Values
+    // generated by this block
+    if (successor) {
+      DEBUG(errs() << "\t\tHandling successor use\n");
+      for (auto &inst : *originalBlock) {
+        DEBUG(errs() << "\t\t\t" << inst << "\n");
+        DEBUG(errs() << "\t\t\t\t" << inst.getNumUses() << " Users\n");
+        if (!inst.getNumUses())
+          continue;
+        std::vector<User *> users;
+        std::vector<PHINode *> phiUsers;
+        bool used = false, usedNonPhi = false;
+        // The instruction object itself is the Value for the result
+        for (auto user = inst.use_begin(), useEnd = inst.use_end();
+             user != useEnd; ++user) {
+          // User is an instruction
+          Instruction *userInst = dyn_cast<Instruction>(*user);
+          assert(userInst && "User is not an instruction!");
+          BasicBlock *userBlock = userInst->getParent();
+          // Instruction belongs to another block that is not us
+          if (userBlock != copyBlock && userBlock != originalBlock) {
+            used = true;
+            DEBUG(errs() << "\t\t\t\tUsed in " << userBlock->getName() << ": "
+                         << *userInst << "\n");
+            // Find a PHI Node
+            PHINode *phiCheck = dyn_cast<PHINode>(userInst);
+            if (phiCheck) {
+              if (phiCheck->getParent() == successor) {
+                DEBUG(errs() << "\t\t\t\t\tSuccessor PHI Node\n");
+                phiUsers.push_back(phiCheck);
               } else {
-                DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
+                DEBUG(errs() << "\t\t\t\t\tNon-Successor PHI Node\n");
                 usedNonPhi = true;
                 users.push_back(*user);
               }
+            } else {
+              DEBUG(errs() << "\t\t\t\t\tNone-PHI Node\n");
+              usedNonPhi = true;
+              users.push_back(*user);
+            }
 #if 0
               // Check if inst is a phinode in successor
               // If it's not in a successor, it's the same as the else case
@@ -331,33 +314,33 @@ struct BogusCF : public FunctionPass {
                 users.push_back(*user);
               }
 #endif
-            }
           }
-          if (!used) {
-            DEBUG(errs() << "\t\t\t\t\tNo use outside of basic block\n");
-            continue;
-          }
+        }
+        if (!used) {
+          DEBUG(errs() << "\t\t\t\t\tNo use outside of basic block\n");
+          continue;
+        }
 
-          if (usedNonPhi) {
-            DEBUG(errs() << "\t\t\t\tCreating PHI Node\n");
-            // If still not, then we will create in successor
-            PHINode *phi =
-                PHINode::Create(inst.getType(), 2, "",
-                                successor->getFirstNonPHIOrDbgOrLifetime());
-            phiUsers.push_back(phi);
+        if (usedNonPhi) {
+          DEBUG(errs() << "\t\t\t\tCreating PHI Node\n");
+          // If still not, then we will create in successor
+          PHINode *phi =
+              PHINode::Create(inst.getType(), 2, "",
+                              successor->getFirstNonPHIOrDbgOrLifetime());
+          phiUsers.push_back(phi);
+        }
+        DEBUG(errs() << "\t\t\t\tUpdating PHI Nodes\n");
+        for (auto phi : phiUsers) {
+          DEBUG(errs() << "\t\t\t\t" << *phi << "\n");
+          if (phi->getBasicBlockIndex(originalBlock) == -1)
+            phi->addIncoming(&inst, originalBlock);
+          if (phi->getBasicBlockIndex(copyBlock) == -1)
+            phi->addIncoming(VMap[&inst], copyBlock);
+          DEBUG(errs() << "\t\t\t\t\tUpdating use\n");
+          // Update users
+          for (User *user : users) {
+            user->replaceUsesOfWith(&inst, phi);
           }
-          DEBUG(errs() << "\t\t\t\tUpdating PHI Nodes\n");
-          for (auto phi : phiUsers) {
-            DEBUG(errs() << "\t\t\t\t" << *phi << "\n");
-            if (phi->getBasicBlockIndex(originalBlock) == -1)
-              phi->addIncoming(&inst, originalBlock);
-            if (phi->getBasicBlockIndex(copyBlock) == -1)
-              phi->addIncoming(VMap[&inst], copyBlock);
-            DEBUG(errs() << "\t\t\t\t\tUpdating use\n");
-            // Update users
-            for (User *user : users) {
-              user->replaceUsesOfWith(&inst, phi);
-            }
 #if 0
             DEBUG(errs()
                   << "\t\t\t\t\tAdding missing incomings for predecessors\n");
@@ -381,10 +364,10 @@ struct BogusCF : public FunctionPass {
             }
 #endif
 
-            DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
-            DemotePHIToStack(phi);
-          }
+          DEBUG(errs() << "\t\t\t\t\tDemoting PHI Node to stack\n");
+          DemotePHIToStack(phi);
         }
+      }
 
 #if 0
         // Now iterate through all the PHINode of successor to see if there
@@ -410,7 +393,7 @@ struct BogusCF : public FunctionPass {
           }
         }
 #endif
-      }
+    }
 
 #if 0
       // Create Opaque Predicates
@@ -427,108 +410,92 @@ struct BogusCF : public FunctionPass {
       DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
 #endif
 
-      // Clear the unconditional branch from the "husk" original block
-      block->getTerminator()->eraseFromParent();
+    // Clear the unconditional branch from the "husk" original block
+    block->getTerminator()->eraseFromParent();
 
-      // Create Opaque Predicate - will turn them into "real ones" in
-      // do finalization
-      // Always true for now
-      Value *lhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
-      Value *rhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
-      FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
+    // Create Opaque Predicate - will turn them into "real ones" in
+    // do finalization
+    // Always true for now
+    Value *lhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
+    Value *rhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
+    FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
 
-      // Bogus conditional branch
-      BranchInst *branch = BranchInst::Create(originalBlock, copyBlock,
-                                              (Value *)condition, block);
-      branch->setMetadata(metaKind, metaNode);
+    // Bogus conditional branch
+    BranchInst *branch =
+        BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
+    branch->setMetadata(metaKind, metaNode);
 
-      hasBeenModified |= true;
-    }
-    DEBUG_WITH_TYPE("cfg", F.viewCFG());
-    if (hasBeenModified)
-      ObfUtils::tagFunction(F, ObfUtils::BogusCFObf);
-    return hasBeenModified;
+    hasBeenModified |= true;
   }
-
-  // Finalisation will add the necessary opaque predicates
-  virtual bool doFinalization(Module &M) {
-    DEBUG(errs() << "Finalising: Creating Opaque Predicates\n");
-
-    std::uniform_int_distribution<int> distribution;
-    std::uniform_int_distribution<int> distributionType(0, 1);
-
-    LLVMContext &context = M.getContext();
-    unsigned metaKind = context.getMDKindID(metaKindName);
-
-    std::vector<GlobalVariable *> globals =
-        OpaquePredicate::prepareModule(M, bcfGlobal);
-    for (auto &function : M) {
-      DEBUG(errs() << "\tFunction " << function.getName() << "\n");
-      bool functionHasBlock = false;
-      for (auto &block : function) {
-        TerminatorInst *terminator = block.getTerminator();
-        if (terminator->getMetadata(metaKind)) {
-          functionHasBlock = true;
-          DEBUG(errs() << "\t\tBlock " << block.getName() << "\n");
-
-          // Checks
-          assert(terminator->getNumSuccessors() == 2 &&
-                 "Stub terminator block should only have 2 successors");
-          Instruction &condition = *(++block.rbegin());
-          assert(isa<FCmpInst>(condition) &&
-                 "Penultimate instruction should be FCmpInst");
-          FCmpInst *fcmp = dyn_cast<FCmpInst>(&condition);
-          assert(fcmp->getNumOperands() == 2 &&
-                 "Penultimate instruction should have two operands");
-          assert(
-              fcmp->getPredicate() == FCmpInst::FCMP_TRUE &&
-              "Penultimate instruction should have an always true predicate");
-
-          BasicBlock *trueBlock = terminator->getSuccessor(0);
-          BasicBlock *falseBlock = terminator->getSuccessor(1);
-          terminator->eraseFromParent();
-          fcmp->eraseFromParent();
-
-          OpaquePredicate::PredicateType type =
-              OpaquePredicate::create(&block, trueBlock, falseBlock, globals,
-                                      [&] { return distribution(engine); },
-                                      [&]()->OpaquePredicate::PredicateType {
-                return static_cast<OpaquePredicate::PredicateType>(
-                    distributionType(engine));
-              });
-          DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
-        }
-      }
-
-      if (functionHasBlock) {
-        DEBUG(errs() << "\tPromoting allocas to registers\n");
-        // Promote alloca to registers
-        std::vector<AllocaInst *> allocas;
-        BasicBlock &entryBlock = function.getEntryBlock();
-        for (Instruction &inst : entryBlock) {
-          if (AllocaInst *alloca = dyn_cast<AllocaInst>(&inst)) {
-            if (isAllocaPromotable(alloca)) {
-              allocas.push_back(alloca);
-            }
-          }
-        }
-
-        // Build dominator tree
-        DominatorTree &DT = getAnalysis<DominatorTree>();
-        DT.getBase().recalculate(function);
-        PromoteMemToReg(allocas, DT);
-
-        DEBUG_WITH_TYPE("cfg", function.viewCFG());
-      }
-    }
-    DEBUG(errs() << "BogusCF: Done.\n");
-    return true;
-  }
-  virtual void getAnalysisUsage(AnalysisUsage &Info) const {
-    Info.addRequired<DominatorTree>();
-  }
-};
+  DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  if (hasBeenModified)
+    ObfUtils::tagFunction(F, ObfUtils::BogusCFObf);
+  return hasBeenModified;
 }
+
+// Finalisation will add the necessary opaque predicates
+bool BogusCF::doFinalization(Module &M) {
+  DEBUG(errs() << "Finalising: Creating Opaque Predicates\n");
+
+  std::uniform_int_distribution<int> distribution;
+  std::uniform_int_distribution<int> distributionType(0, 1);
+
+  LLVMContext &context = M.getContext();
+  unsigned metaKind = context.getMDKindID(metaKindName);
+
+  std::vector<GlobalVariable *> globals =
+      OpaquePredicate::prepareModule(M, bcfGlobal);
+  for (auto &function : M) {
+    DEBUG(errs() << "\tFunction " << function.getName() << "\n");
+    bool functionHasBlock = false;
+    for (auto &block : function) {
+      TerminatorInst *terminator = block.getTerminator();
+      if (terminator->getMetadata(metaKind)) {
+        functionHasBlock = true;
+        DEBUG(errs() << "\t\tBlock " << block.getName() << "\n");
+
+        // Checks
+        assert(terminator->getNumSuccessors() == 2 &&
+               "Stub terminator block should only have 2 successors");
+        Instruction &condition = *(++block.rbegin());
+        assert(isa<FCmpInst>(condition) &&
+               "Penultimate instruction should be FCmpInst");
+        FCmpInst *fcmp = dyn_cast<FCmpInst>(&condition);
+        assert(fcmp->getNumOperands() == 2 &&
+               "Penultimate instruction should have two operands");
+        assert(fcmp->getPredicate() == FCmpInst::FCMP_TRUE &&
+               "Penultimate instruction should have an always true predicate");
+
+        BasicBlock *trueBlock = terminator->getSuccessor(0);
+        BasicBlock *falseBlock = terminator->getSuccessor(1);
+        terminator->eraseFromParent();
+        fcmp->eraseFromParent();
+
+        OpaquePredicate::PredicateType type =
+            OpaquePredicate::create(&block, trueBlock, falseBlock, globals,
+                                    [&] { return distribution(engine); },
+                                    [&]()->OpaquePredicate::PredicateType {
+              return static_cast<OpaquePredicate::PredicateType>(
+                  distributionType(engine));
+            });
+        DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
+      }
+    }
+
+    if (functionHasBlock) {
+      DEBUG(errs() << "\tPromoting allocas to registers\n");
+      DominatorTree &DT = getAnalysis<DominatorTree>();
+      ObfUtils::promoteAllocas(function, DT);
+      DEBUG_WITH_TYPE("cfg", function.viewCFG());
+    }
+  }
+  DEBUG(errs() << "BogusCF: Done.\n");
+  return true;
+}
+void BogusCF::getAnalysisUsage(AnalysisUsage &Info) const {
+  Info.addRequired<DominatorTree>();
+}
+
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
 X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);

@@ -13,6 +13,7 @@
 #define OBF_UTILITIES_H
 
 #include "llvm/IR/Function.h"
+#include "llvm/Analysis/Dominators.h"
 using namespace llvm;
 
 namespace ObfUtils {
@@ -27,6 +28,9 @@ namespace ObfUtils {
 
   // Check if a function has been tagged as obfuscated
   bool checkFunctionTagged(Function &F, ObfType type);
+
+  // Promote all allocas to PHO, if possible
+  void promoteAllocas(Function &F, DominatorTree &DT);
 };
 
 #endif
