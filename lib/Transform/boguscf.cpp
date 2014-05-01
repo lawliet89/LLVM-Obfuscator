@@ -141,6 +141,7 @@ struct BogusCF : public FunctionPass {
     // splitting into two bogus control flow for a later time
     std::vector<BasicBlock *> blocks;
     blocks.reserve(F.size());
+    std::vector<PHINode *> phis;
 
     DEBUG(errs() << "\t" << F.size() << " basic blocks found\n");
     Twine blockPrefix = "block_";
@@ -152,6 +153,11 @@ struct BogusCF : public FunctionPass {
       DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
 
       DEBUG(errs() << "\tBlock " << block.getName() << "\n");
+      for (auto &inst : block) {
+        if (PHINode *phi = dyn_cast<PHINode>(&inst)) {
+          phis.push_back(phi);
+        }
+      }
       BasicBlock::iterator inst1 = block.begin();
       if (block.getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block.getFirstNonPHIOrDbgOrLifetime();
@@ -185,6 +191,11 @@ struct BogusCF : public FunctionPass {
       return false;
     }
 
+    DEBUG(errs() << "\tDemoting PHI instructions to allocas\n");
+    for (auto phi : phis) {
+      DemotePHIToStack(phi);
+    }
+
     LLVMContext &context = F.getContext();
     MDNode *metaNode =
         MDNode::get(context, MDString::get(context, metaKindName));
@@ -198,6 +209,7 @@ struct BogusCF : public FunctionPass {
 
     for (BasicBlock *block : blocks) {
       DEBUG(errs() << "\tBlock " << block->getName() << "\n");
+
       BasicBlock::iterator inst1 = block->begin();
       if (block->getFirstNonPHIOrDbgOrLifetime()) {
         inst1 = block->getFirstNonPHIOrDbgOrLifetime();
@@ -338,16 +350,17 @@ struct BogusCF : public FunctionPass {
             for (User *user : users) {
               user->replaceUsesOfWith(&inst, phi);
             }
+#if 0
             DEBUG(errs()
                   << "\t\t\t\t\tAdding missing incomings for predecessors\n");
-// Add incoming phi nodes for all the successor's predecessors
-// to point to itself
-// This is because the Value was used not in a PHINode but from
-// our own created one, then the Value must have only been
-// produced
-// in the block that we just split. And thus not going to be
-// changed
-#if 0
+            // Add incoming phi nodes for all the successor's predecessors
+            // to point to itself
+            // This is because the Value was used not in a PHINode but from
+            // our own created one, then the Value must have only been
+            // produced
+            // in the block that we just split. And thus not going to be
+            // changed
+
             for (auto pred = pred_begin(successor),
                       predEnd = pred_end(successor);
                  pred != predEnd; ++pred) {
@@ -365,6 +378,7 @@ struct BogusCF : public FunctionPass {
           }
         }
 
+#if 0
         // Now iterate through all the PHINode of successor to see if there
         // are any incoming blocks from the original block but not from the
         // clone block -- could be due to constant Value for example
@@ -387,6 +401,7 @@ struct BogusCF : public FunctionPass {
             }
           }
         }
+#endif
       }
 
 #if 0
@@ -498,7 +513,7 @@ struct BogusCF : public FunctionPass {
         DEBUG_WITH_TYPE("cfg", function.viewCFG());
       }
     }
-
+    DEBUG(errs() << "BogusCF: Done.\n");
     return true;
   }
   virtual void getAnalysisUsage(AnalysisUsage &Info) const {
