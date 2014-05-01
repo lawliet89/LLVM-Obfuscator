@@ -16,11 +16,17 @@
 using namespace llvm;
 
 namespace ObfUtils {
-  // Tag a function as "obfuscated"
-  void tagFunction(Function &F);
+  enum ObfType {
+    BogusCFObf,
+    FlattenObf
+  };
+
+  // Tag a function as "obfuscated" - this can be useful for mutually exclusive
+  // obfuscation passes
+  void tagFunction(Function &F, ObfType type);
 
   // Check if a function has been tagged as obfuscated
-  bool checkFunctionTagged(Function &F);
+  bool checkFunctionTagged(Function &F, ObfType type);
 };
 
 #endif

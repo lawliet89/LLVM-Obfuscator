@@ -89,11 +89,6 @@ struct Flatten : public FunctionPass {
 
     DEBUG(errs() << "flatten: Function '" << F.getName() << "'\n");
 
-    if (ObfUtils::checkFunctionTagged(F)) {
-      DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
-      return false;
-    }
-
     // Check if function is requested
     auto funcListStart = flattenFunc.begin(), funcListEnd = flattenFunc.end();
     if (flattenFunc.size() != 0 &&
@@ -415,7 +410,7 @@ struct Flatten : public FunctionPass {
     DEBUG(F.viewCFG());
     // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
-    ObfUtils::tagFunction(F);
+    ObfUtils::tagFunction(F, ObfUtils::FlattenObf);
     return true;
   }
 

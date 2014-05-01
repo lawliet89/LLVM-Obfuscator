@@ -125,11 +125,6 @@ struct BogusCF : public FunctionPass {
 
     DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
 
-    if (ObfUtils::checkFunctionTagged(F)) {
-      DEBUG(errs() << "\tFunction already obfuscated -- skipping\n");
-      return false;
-    }
-
     auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
     if (bcfFunc.size() != 0 &&
         std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
@@ -451,7 +446,7 @@ struct BogusCF : public FunctionPass {
     }
     DEBUG_WITH_TYPE("cfg", F.viewCFG());
     if (hasBeenModified)
-      ObfUtils::tagFunction(F);
+      ObfUtils::tagFunction(F, ObfUtils::BogusCFObf);
     return hasBeenModified;
   }
 

@@ -15,13 +15,23 @@
 #include "llvm/IR/Metadata.h"
 
 namespace {
-StringRef metaKindName = "obf_mark";
+StringRef getMetaKindName(ObfUtils::ObfType type) {
+  switch(type) {
+    case ObfUtils::BogusCFObf:
+      return StringRef("obf_boguscf");
+    case ObfUtils::FlattenObf:
+      return StringRef("obf_flatten");
+    default:
+      llvm_unreachable("Unknown obfuscation type");
+  }
+}
 };
 
 namespace ObfUtils {
 // Tag a function as "obfuscated"
-void tagFunction(Function &F) {
+void tagFunction(Function &F, ObfType type) {
   LLVMContext &context = F.getContext();
+  StringRef metaKindName = getMetaKindName(type);
   MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
   unsigned metaKind = context.getMDKindID(metaKindName);
 
@@ -30,11 +40,10 @@ void tagFunction(Function &F) {
   first->setMetadata(metaKind, metaNode);
 }
 
-// Check if a function has been tagged as obfuscated
-bool checkFunctionTagged(Function &F) {
-  return false; // debugging
-
+// Check if a function has been tagged as obfuscated of type
+bool checkFunctionTagged(Function &F, ObfType type) {
   LLVMContext &context = F.getContext();
+  StringRef metaKindName = getMetaKindName(type);
   unsigned metaKind = context.getMDKindID(metaKindName);
   // Get first instruction
   Instruction *first = (Instruction *)(F.getEntryBlock().begin());
