@@ -14,7 +14,6 @@
 #include "llvm/Analysis/Dominators.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/IR/Constants.h"
@@ -417,9 +416,3 @@ void Flatten::getAnalysisUsage(AnalysisUsage &Info) const {
 char Flatten::ID = 0;
 static RegisterPass<Flatten> X("flatten", "Flatten function control flow",
                                false, false);
-// http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
-static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
-                                [](const PassManagerBuilder &,
-                                   PassManagerBase &PM) {
-  PM.add(new Flatten());
-});
