@@ -85,7 +85,7 @@ bool Copy::runOnModule(Module &M) {
     cloneList.push_back(&F);
   }
 
-  for (Function *F : cloneList){
+  for (Function *F : cloneList) {
     hasBeenModified |= true;
 
     // Refer to
@@ -99,9 +99,7 @@ bool Copy::runOnModule(Module &M) {
         FunctionType::get(F->getFunctionType()->getReturnType(), ArgTypes,
                           F->getFunctionType()->isVarArg());
 
-    Twine cloneName("");
-    DEBUG(cloneName = cloneName.concat(F->getName()).concat("_clone"));
-    Function *clone = Function::Create(FTy, F->getLinkage(), cloneName, &M);
+    Function *clone = Function::Create(FTy, F->getLinkage(), F->getName(), &M);
 
     Function::arg_iterator DestI = clone->arg_begin();
     for (Function::const_arg_iterator I = F->arg_begin(), E = F->arg_end();
