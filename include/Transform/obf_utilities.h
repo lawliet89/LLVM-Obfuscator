@@ -13,25 +13,29 @@
 #define OBF_UTILITIES_H
 
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/Analysis/Dominators.h"
 using namespace llvm;
 
 namespace ObfUtils {
-  enum ObfType {
-    BogusCFObf,
-    FlattenObf,
-    CopyObf
-  };
+enum ObfType {
+  NoneObf,
+  BogusCFObf,
+  FlattenObf,
+  CopyObf,
+  InlineObf
+};
 
-  // Tag a function as "obfuscated" - this can be useful for mutually exclusive
-  // obfuscation passes
-  void tagFunction(Function &F, ObfType type);
+// Tag a function as "obfuscated" - this can be useful for mutually exclusive
+// obfuscation passes
+void tagFunction(Function &F, ObfType type);
+void tagFunction(Function &F, ObfType type, ArrayRef<Value *> values);
 
-  // Check if a function has been tagged as obfuscated
-  bool checkFunctionTagged(Function &F, ObfType type);
+// Check if a function has been tagged as obfuscated
+MDNode *checkFunctionTagged(Function &F, ObfType type);
 
-  // Promote all allocas to PHO, if possible
-  void promoteAllocas(Function &F, DominatorTree &DT);
+// Promote all allocas to PHO, if possible
+void promoteAllocas(Function &F, DominatorTree &DT);
 };
 
 #endif

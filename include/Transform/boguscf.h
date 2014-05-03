@@ -28,5 +28,8 @@ struct BogusCF : public FunctionPass {
   virtual bool runOnFunction(Function &F);
   virtual bool doFinalization(Module &M);
   virtual void getAnalysisUsage(AnalysisUsage &Info) const;
+
+  // Check to see if a function is eligible for bogus CF processing
+  static bool isEligible(Function &F);
 };
 #endif

@@ -492,6 +492,49 @@ void BogusCF::getAnalysisUsage(AnalysisUsage &Info) const {
   Info.addRequired<DominatorTree>();
 }
 
+bool BogusCF::isEligible(Function &F) {
+  DEBUG(errs() << "BogusCF: Checking " << F.getName() << " eligibility:\n");
+  if (F.isDeclaration()) {
+    DEBUG(errs() << "\tIneligible -- declaration\n");
+    return false;
+  }
+  unsigned eligibleBB = 0;
+  DEBUG(errs() << "\tInspecting basic blocks\n");
+  BasicBlock &entryBlock = F.getEntryBlock();
+  for (auto &block : F) {
+    BasicBlock::iterator inst1 = block.begin();
+    if (block.getFirstNonPHIOrDbgOrLifetime()) {
+      inst1 = block.getFirstNonPHIOrDbgOrLifetime();
+    }
+    if (isa<TerminatorInst>(inst1)) {
+      continue;
+    }
+    if (block.isLandingPad()) {
+      continue;
+    }
+
+    if (&block == &entryBlock) {
+      continue;
+    }
+
+    // We skip functions with InvokeInst because PHI demotions are not
+    // supported with invoke edges by LLVM yet.
+    TerminatorInst *terminator = block.getTerminator();
+    if (isa<InvokeInst>(terminator)) {
+      DEBUG(errs() << "\tIneligible -- Function has InvokeInst\n");
+      return false;
+    }
+    ++eligibleBB;
+  }
+
+  if (!eligibleBB) {
+    DEBUG(errs() << "\tIneligible -- No eligible basic blocks\n");
+    return false;
+  }
+  DEBUG(errs() << "\tEligible\n");
+  return true;
+}
+
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
 X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);

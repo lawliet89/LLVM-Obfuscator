@@ -12,7 +12,6 @@
 #include "Transform/obf_utilities.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Metadata.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include <vector>
 
@@ -32,11 +31,10 @@ StringRef getMetaKindName(ObfUtils::ObfType type) {
 };
 
 namespace ObfUtils {
-// Tag a function as "obfuscated"
-void tagFunction(Function &F, ObfType type) {
+void tagFunction(Function &F, ObfType type, ArrayRef<Value *> values) {
   LLVMContext &context = F.getContext();
   StringRef metaKindName = getMetaKindName(type);
-  MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
+  MDNode *metaNode = MDNode::get(context, values);
   unsigned metaKind = context.getMDKindID(metaKindName);
 
   // Get first instruction
@@ -44,14 +42,20 @@ void tagFunction(Function &F, ObfType type) {
   first->setMetadata(metaKind, metaNode);
 }
 
+// Tag a function as "obfuscated"
+void tagFunction(Function &F, ObfType type) {
+  return tagFunction(F, type,
+                     MDString::get(F.getContext(), getMetaKindName(type)));
+}
+
 // Check if a function has been tagged as obfuscated of type
-bool checkFunctionTagged(Function &F, ObfType type) {
+MDNode *checkFunctionTagged(Function &F, ObfType type) {
   LLVMContext &context = F.getContext();
   StringRef metaKindName = getMetaKindName(type);
   unsigned metaKind = context.getMDKindID(metaKindName);
   // Get first instruction
   Instruction *first = (Instruction *)(F.getEntryBlock().begin());
-  return bool(first->getMetadata(metaKind));
+  return first->getMetadata(metaKind);
 }
 
 void promoteAllocas(Function &F, DominatorTree &DT) {

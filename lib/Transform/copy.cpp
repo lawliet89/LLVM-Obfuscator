@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "copy"
 #include "Transform/copy.h"
+#include "Transform/boguscf.h"
 #include "Transform/obf_utilities.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -39,6 +40,12 @@ static cl::opt<double> copyProbability(
 static cl::opt<std::string>
 copySeed("copySeed", cl::init(""),
          cl::desc("Seed for random number generator. Defaults to system time"));
+
+static cl::opt<bool> copyEnsureEligibility(
+    "copyEnsureEligibility", cl::init(true),
+    cl::desc("Check and ensure that functions can be obfuscated by at least "
+             "one obfuscating pass before copying it, and then marking it from "
+             "a randomly list of eligible ones. Defaults to true"));
 
 bool Copy::runOnModule(Module &M) {
   // Initialise
@@ -81,11 +88,24 @@ bool Copy::runOnModule(Module &M) {
         continue;
       }
     }
-    DEBUG(errs() << "\tCloning\n");
+    DEBUG(errs() << "\tMark for Cloning\n");
     cloneList.push_back(&F);
   }
 
   for (Function *F : cloneList) {
+    DEBUG(errs() << F->getName() << ":\n");
+
+    ObfUtils::ObfType mustObfType = ObfUtils::NoneObf;
+    if (copyEnsureEligibility) {
+      std::vector<ObfUtils::ObfType> eligible;
+      DEBUG(errs() << "\tChecking eligibility:\n");
+
+      if (BogusCF::isEligible(*F)) {
+        DEBUG(errs() << "\t\tBogusCF\n");
+        eligible.push_back(ObfUtils::BogusCFObf);
+      }
+    }
+
     hasBeenModified |= true;
 
     // Refer to http://git.io/2mp3-Q
@@ -109,8 +129,8 @@ bool Copy::runOnModule(Module &M) {
     SmallVector<ReturnInst *, 8> Returns; // Ignore returns cloned.
     CloneFunctionInto(clone, F, VMap, true, Returns);
 
-    // Tag function
-    ObfUtils::tagFunction(*clone, ObfUtils::CopyObf);
+    // Tag cloned function
+    ObfUtils::tagFunction(*clone, ObfUtils::CopyObf, F);
 
     // TODO: find users and maybe use opaque predicates to use clone?
   }
