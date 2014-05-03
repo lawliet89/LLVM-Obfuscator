@@ -143,8 +143,7 @@ bool BogusCF::runOnFunction(Function &F) {
     }
     // We do not want to transform a basic block that is only involved with
     // terminator instruction or is a landing pad for an exception
-    // c.f.
-    // https://github.com/llvm-mirror/llvm/blob/release_34/lib/Transforms/Utils/DemoteRegToStack.cpp#L130
+    // c.f. http://git.io/OpQeCQ
     if (isa<TerminatorInst>(inst1)) {
       DEBUG(errs() << "\t\tSkipping: PHI and Terminator only\n");
       ++NumBlocksSkipped;

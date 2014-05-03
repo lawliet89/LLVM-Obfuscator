@@ -88,8 +88,7 @@ bool Copy::runOnModule(Module &M) {
   for (Function *F : cloneList) {
     hasBeenModified |= true;
 
-    // Refer to
-    // https://github.com/llvm-mirror/llvm/blob/release_34/lib/Transforms/Utils/CloneFunction.cpp#L162
+    // Refer to http://git.io/2mp3-Q
     std::vector<Type *> ArgTypes;
     ValueToValueMapTy VMap;
     for (Function::const_arg_iterator I = F->arg_begin(), E = F->arg_end();
