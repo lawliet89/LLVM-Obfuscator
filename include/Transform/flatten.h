@@ -31,6 +31,8 @@ struct Flatten : public FunctionPass {
   virtual bool runOnFunction(Function &F);
   // virtual bool doFinalization(Module &M);
   virtual void getAnalysisUsage(AnalysisUsage &Info) const;
+
+  static bool isEligible(Function &F);
 };
 
 #endif

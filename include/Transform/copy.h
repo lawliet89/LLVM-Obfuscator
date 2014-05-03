@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 #ifndef COPY_H
 #define COPY_H
-
+#include "Transform/obf_utilities.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include <random>
@@ -21,6 +21,13 @@ struct Copy : public ModulePass {
 
   Copy() : ModulePass(ID) {}
   virtual bool runOnModule(Module &M);
+
+  // Tag this function as "must obfuscate of type"
+  static void tagFunction(Function &F, ObfUtils::ObfType type);
+  static bool isFunctionTagged(Function &F, ObfUtils::ObfType type);
+
+private:
+  static StringRef obfString(ObfUtils::ObfType type);
 };
 
 #endif

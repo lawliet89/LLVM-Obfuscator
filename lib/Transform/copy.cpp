@@ -9,7 +9,7 @@
 #define DEBUG_TYPE "copy"
 #include "Transform/copy.h"
 #include "Transform/boguscf.h"
-#include "Transform/obf_utilities.h"
+#include "Transform/flatten.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
@@ -104,6 +104,20 @@ bool Copy::runOnModule(Module &M) {
         DEBUG(errs() << "\t\tBogusCF\n");
         eligible.push_back(ObfUtils::BogusCFObf);
       }
+      if (Flatten::isEligible(*F)) {
+        DEBUG(errs() << "\t\tFlatten\n");
+        eligible.push_back(ObfUtils::FlattenObf);
+      }
+
+      if (eligible.empty()) {
+        DEBUG(errs() << "\t\tNon eligible -- skipping\n");
+        continue;
+      }
+
+      // Choose a random one
+      std::uniform_int_distribution<unsigned> distribution(0,
+                                                           eligible.size() - 1);
+      mustObfType = eligible[distribution(engine)];
     }
 
     hasBeenModified |= true;
@@ -130,12 +144,59 @@ bool Copy::runOnModule(Module &M) {
     CloneFunctionInto(clone, F, VMap, true, Returns);
 
     // Tag cloned function
-    ObfUtils::tagFunction(*clone, ObfUtils::CopyObf, F);
+    if (mustObfType != ObfUtils::NoneObf) {
+      std::string type;
+      switch (mustObfType) {
+      case ObfUtils::BogusCFObf:
+        type = "boguscf";
+        break;
+      case ObfUtils::FlattenObf:
+        type = "flatten";
+        break;
+      default:
+        llvm_unreachable("Invalid obfuscation type");
+      }
+      ObfUtils::tagFunction(*clone, ObfUtils::CopyObf,
+                            MDString::get(F->getContext(), type.c_str()));
+    }
 
     // TODO: find users and maybe use opaque predicates to use clone?
   }
 
   return hasBeenModified;
+}
+
+void Copy::tagFunction(Function &F, ObfUtils::ObfType type) {
+  ObfUtils::tagFunction(F, ObfUtils::CopyObf,
+                        MDString::get(F.getContext(), obfString(type)));
+}
+
+bool Copy::isFunctionTagged(Function &F, ObfUtils::ObfType type) {
+  MDNode *md = ObfUtils::checkFunctionTagged(F, type);
+  if (!md)
+    return false;
+  if (md->getNumOperands() < 1)
+    return false;
+  MDString *str = dyn_cast<MDString>(md->getOperand(0));
+  if (!str)
+    return false;
+  StringRef expectedString = obfString(type);
+  if (str->getString() == expectedString)
+    return true;
+  return false;
+}
+
+StringRef Copy::obfString(ObfUtils::ObfType type) {
+  switch (type) {
+  case ObfUtils::BogusCFObf:
+    return StringRef("boguscf");
+    break;
+  case ObfUtils::FlattenObf:
+    return StringRef("flatten");
+    break;
+  default:
+    llvm_unreachable("Invalid obfuscation type");
+  }
 }
 
 char Copy::ID = 0;

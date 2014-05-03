@@ -9,6 +9,7 @@
 // http://ac.inf.elte.hu/Vol_030_2009/003.pdf
 #define DEBUG_TYPE "flatten"
 #include "Transform/flatten.h"
+#include "Transform/copy.h"
 #include "Transform/obf_utilities.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/Dominators.h"
@@ -72,12 +73,12 @@ bool Flatten::runOnFunction(Function &F) {
   if (F.isDeclaration()) {
     return false;
   }
-
+  bool mustObfuscate = Copy::isFunctionTagged(F, ObfUtils::FlattenObf);
   DEBUG(errs() << "flatten: Function '" << F.getName() << "'\n");
 
   // Check if function is requested
   auto funcListStart = flattenFunc.begin(), funcListEnd = flattenFunc.end();
-  if (flattenFunc.size() != 0 &&
+  if (!mustObfuscate && flattenFunc.size() != 0 &&
       std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
     DEBUG(errs() << "\tFunction not requested -- skipping\n");
     return false;
@@ -411,6 +412,62 @@ bool Flatten::runOnFunction(Function &F) {
 #endif
 void Flatten::getAnalysisUsage(AnalysisUsage &Info) const {
   Info.addRequired<DominatorTree>();
+}
+
+bool Flatten::isEligible(Function &F) {
+  DEBUG(errs() << "Flatten: Checking " << F.getName() << " eligibility:\n");
+  if (F.isDeclaration()) {
+    DEBUG(errs() << "\tIneligible -- declaration\n");
+    return false;
+  }
+  unsigned eligibleBB = 0;
+  DEBUG(errs() << "\tInspecting basic blocks\n");
+  BasicBlock &entryBlock = F.getEntryBlock();
+  for (auto &block : F) {
+    BasicBlock::iterator inst1 = block.begin();
+    if (block.getFirstNonPHIOrDbgOrLifetime()) {
+      inst1 = block.getFirstNonPHIOrDbgOrLifetime();
+    }
+
+    if (isa<IndirectBrInst>(block.getTerminator())) {
+      // TODO Maybe handle this
+      DEBUG(errs() << "\tIneligible function -- IndirectBrInst encountered\n");
+      return false;
+    }
+
+    if (isa<SwitchInst>(block.getTerminator())) {
+      // TODO Maybe handle this
+      DEBUG(errs() << "\tIneligible function -- SwitchInst encountered\n");
+      return false;
+    }
+
+    // LLVM does not support PHINodes for Invoke Edges
+    if (isa<InvokeInst>(block.getTerminator())) {
+      // TODO Maybe handle this
+      DEBUG(errs() << "\tIneligible function -- InvokeInst encountered\n");
+      return false;
+    }
+
+    if (block.isLandingPad()) {
+      continue;
+    }
+    if (&block == &entryBlock) {
+      continue;
+    }
+    ++eligibleBB;
+  }
+
+  if (!eligibleBB) {
+    DEBUG(errs() << "\tIneligible function -- No eligible BB\n");
+    return false;
+  }
+
+  if (entryBlock.getTerminator()->getNumSuccessors() == eligibleBB ||
+      entryBlock.getTerminator()->getNumSuccessors() == 0) {
+    DEBUG(errs() << "\ttIneligible function -- already flat control flow\n");
+    return false;
+  }
+  return true;
 }
 
 char Flatten::ID = 0;

@@ -28,6 +28,7 @@
 
 #define DEBUG_TYPE "boguscf"
 #include "Transform/boguscf.h"
+#include "Transform/copy.h"
 #include "Transform/opaque_predicate.h"
 #include "Transform/obf_utilities.h"
 #include "llvm/ADT/Statistic.h"
@@ -100,14 +101,20 @@ bool BogusCF::runOnFunction(Function &F) {
   if (F.isDeclaration()) {
     return false;
   }
-  if (bcfProbability == 0.f) {
+
+  bool mustObfuscate = Copy::isFunctionTagged(F, ObfUtils::BogusCFObf);
+  if (!mustObfuscate && bcfProbability == 0.f) {
     return false;
   }
 
   DEBUG(errs() << "bcf: Function '" << F.getName() << "'\n");
 
+  if (mustObfuscate) {
+    DEBUG(errs() << "\tMarked as must obfuscate\n");
+  }
+
   auto funcListStart = bcfFunc.begin(), funcListEnd = bcfFunc.end();
-  if (bcfFunc.size() != 0 &&
+  if (!mustObfuscate && bcfFunc.size() != 0 &&
       std::find(funcListStart, funcListEnd, F.getName()) == funcListEnd) {
     DEBUG(errs() << "\tFunction not requested -- skipping\n");
     return false;
