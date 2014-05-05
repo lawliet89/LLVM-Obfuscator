@@ -9,6 +9,7 @@
 #include "Transform/boguscf.h"
 #include "Transform/copy.h"
 #include "Transform/flatten.h"
+#include "Transform/identifier_renamer.h"
 #include "Transform/inline_function.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -23,4 +24,5 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new InlineFunctionPass());
   PM.add(new Flatten());
   PM.add(new BogusCF());
+  PM.add(new IdentifierRenamer());
 });
