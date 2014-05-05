@@ -185,7 +185,7 @@ std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number) {
     Value *zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0, true);
     GlobalVariable *global = new GlobalVariable(
         M, Type::getInt32Ty(M.getContext()), false, GlobalValue::CommonLinkage,
-        (Constant *)zero, "", nullptr, GlobalVariable::GeneralDynamicTLSModel);
+        (Constant *)zero, "");
     assert(global && "Null globals created!");
     globals[i] = global;
   }
