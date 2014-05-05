@@ -8,11 +8,12 @@
 //===----------------------------------------------------------------------===//
 // Opaque predicates are based on the equations given in the paper at
 // http://crypto.cs.mcgill.ca/~garboit/sp-paper.pdf
-
+#define DEBUG_TYPE "utilities"
 #include "Transform/obf_utilities.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
+#include "llvm/Support/Debug.h"
 #include <vector>
 
 namespace {
@@ -59,6 +60,7 @@ MDNode *checkFunctionTagged(Function &F, ObfType type) {
 }
 
 void promoteAllocas(Function &F, DominatorTree &DT) {
+  DEBUG(errs() << "PromoteAllocas: Function " << F.getName() << "\n");
   std::vector<AllocaInst *> allocas;
   for (auto &block : F) {
     for (Instruction &inst : block) {
@@ -69,7 +71,7 @@ void promoteAllocas(Function &F, DominatorTree &DT) {
       }
     }
   }
-
+  DEBUG(errs() << "\tPromoting " << allocas.size() << " allocas\n");
   DT.getBase().recalculate(F);
   PromoteMemToReg(allocas, DT);
 }

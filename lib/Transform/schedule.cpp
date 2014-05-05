@@ -11,10 +11,10 @@
 #include "Transform/flatten.h"
 #include "Transform/identifier_renamer.h"
 #include "Transform/inline_function.h"
+#include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace llvm;
-
 // Schedue the passes
 // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
@@ -25,4 +25,8 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new Flatten());
   PM.add(new BogusCF());
   PM.add(new IdentifierRenamer());
+
+  // Clean ups
+  PM.add(createPromoteMemoryToRegisterPass());
+  PM.add(createCFGSimplificationPass());
 });
