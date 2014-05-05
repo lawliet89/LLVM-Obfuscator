@@ -12,11 +12,11 @@
 #include "llvm/PassManager.h"
 using namespace llvm;
 
-struct IdentifierRenamer : public BasicBlockPass {
+struct IdentifierRenamer : public FunctionPass {
   static char ID;
 
-  IdentifierRenamer() : BasicBlockPass(ID) {}
-  virtual bool runOnBasicBlock(BasicBlock &BB);
+  IdentifierRenamer() : FunctionPass(ID) {}
+  virtual bool runOnFunction(Function &F);
 };
 
 #endif
