@@ -201,6 +201,7 @@ bool Flatten::runOnFunction(Function &F) {
   IRBuilder<> entryBuilder(&entryBlock);
 
   BasicBlock *jumpBlock = BasicBlock::Create(context, "", &F);
+  jumpBlock->moveBefore(initialBlock);
   DEBUG(jumpBlock->setName("jump_block"));
 
   // Jump Block builder
