@@ -20,6 +20,7 @@ using namespace llvm;
 struct Flatten : public FunctionPass {
   static char ID;
   std::minstd_rand engine;
+  std::bernoulli_distribution trial;
   StringRef metaKindName;
 
   Flatten() : FunctionPass(ID), metaKindName("FlattenSwitch") {}

@@ -44,6 +44,10 @@ static cl::opt<std::string> flattenSeed(
     "flattenSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
+static cl::opt<double>
+flattenProbability("flattenProbability", cl::init(0.5),
+                   cl::desc("Probability that a function will be split"));
+
 Value *Flatten::findBlock(LLVMContext &context,
                           std::vector<BasicBlock *> &blocks,
                           BasicBlock *block) {
@@ -55,6 +59,10 @@ Value *Flatten::findBlock(LLVMContext &context,
 
 // Initialise and check options
 bool Flatten::doInitialization(Module &M) {
+  if (flattenProbability < 0.f || flattenProbability > 1.f) {
+    LLVMContext &ctx = getGlobalContext();
+    ctx.emitError("Flatten: Probability must be between 0 and 1");
+  }
   // Seed engine and create distribution
   if (!flattenSeed.empty()) {
     std::seed_seq seed(flattenSeed.begin(), flattenSeed.end());
@@ -63,7 +71,8 @@ bool Flatten::doInitialization(Module &M) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     engine.seed(seed);
   }
-
+  trial.param(
+      std::bernoulli_distribution::param_type((double)flattenProbability));
   return false;
 }
 
@@ -150,10 +159,15 @@ bool Flatten::runOnFunction(Function &F) {
     return false;
   }
 
+  if (!trial(engine)) {
+    DEBUG(errs() << "\tSkipping: Bernoulli trial failed\n");
+    return false;
+  }
+
   MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
   unsigned metaKind = context.getMDKindID(metaKindName);
 
-  DEBUG(F.viewCFG());
+  DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   // Demote all the PHI Nodes to stack
   DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
@@ -379,7 +393,7 @@ bool Flatten::runOnFunction(Function &F) {
   DEBUG(errs() << "\tPromoting allocas to registers\n");
   DominatorTree &DT = getAnalysis<DominatorTree>();
   ObfUtils::promoteAllocas(F, DT);
-  DEBUG(F.viewCFG());
+  DEBUG_WITH_TYPE("cfg", F.viewCFG());
   // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   ObfUtils::tagFunction(F, ObfUtils::FlattenObf);
