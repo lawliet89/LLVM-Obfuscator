@@ -22,8 +22,8 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                    PassManagerBase &PM) {
   PM.add(new Copy());
   PM.add(new InlineFunctionPass());
-  PM.add(new Flatten());
   PM.add(new BogusCF());
+  PM.add(new Flatten());
   PM.add(new IdentifierRenamer());
 
   // Clean ups

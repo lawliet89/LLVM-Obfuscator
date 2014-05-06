@@ -17,22 +17,18 @@
 
 using namespace llvm;
 
-struct Flatten : public FunctionPass {
+struct Flatten : public ModulePass {
   static char ID;
   std::minstd_rand engine;
   std::bernoulli_distribution trial;
   StringRef metaKindName;
 
-  Flatten() : FunctionPass(ID), metaKindName("FlattenSwitch") {}
+  Flatten() : ModulePass(ID), metaKindName("FlattenSwitch") {}
 
   inline Value *findBlock(LLVMContext &context,
                           std::vector<BasicBlock *> &blocks, BasicBlock *block);
-
-  virtual bool doInitialization(Module &M);
-  virtual bool runOnFunction(Function &F);
-  // virtual bool doFinalization(Module &M);
-  virtual void getAnalysisUsage(AnalysisUsage &Info) const;
-
+  virtual bool runOnModule(Module &M);
+  bool runOnFunction(Function &F);
   static bool isEligible(Function &F);
 };
 

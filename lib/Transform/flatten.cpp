@@ -58,7 +58,7 @@ Value *Flatten::findBlock(LLVMContext &context,
 }
 
 // Initialise and check options
-bool Flatten::doInitialization(Module &M) {
+bool Flatten::runOnModule(Module &M) {
   if (flattenProbability < 0.f || flattenProbability > 1.f) {
     LLVMContext &ctx = getGlobalContext();
     ctx.emitError("Flatten: Probability must be between 0 and 1");
@@ -73,7 +73,15 @@ bool Flatten::doInitialization(Module &M) {
   }
   trial.param(
       std::bernoulli_distribution::param_type((double)flattenProbability));
-  return false;
+
+
+  bool hasBeenModified = false;
+
+  for (Function &F : M) {
+    hasBeenModified |= runOnFunction(F);
+  }
+
+  return hasBeenModified;
 }
 
 bool Flatten::runOnFunction(Function &F) {
@@ -390,10 +398,6 @@ bool Flatten::runOnFunction(Function &F) {
     }
   }
 
-  // Promote allocas to register
-  DEBUG(errs() << "\tPromoting allocas to registers\n");
-  DominatorTree &DT = getAnalysis<DominatorTree>();
-  ObfUtils::promoteAllocas(F, DT);
   DEBUG_WITH_TYPE("cfg", F.viewCFG());
   // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
@@ -425,9 +429,6 @@ bool Flatten::runOnFunction(Function &F) {
     return modified;
   }
 #endif
-void Flatten::getAnalysisUsage(AnalysisUsage &Info) const {
-  Info.addRequired<DominatorTree>();
-}
 
 bool Flatten::isEligible(Function &F) {
   DEBUG(errs() << "Flatten: Checking " << F.getName() << " eligibility:\n");
