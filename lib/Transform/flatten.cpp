@@ -36,17 +36,17 @@
 using namespace llvm;
 
 static cl::list<std::string>
-flattenFunc("flattenFunc", cl::CommaSeparated,
-            cl::desc("Insert Bogus Control Flow only for some functions: "
-                     "flattenFunc=\"func1,func2\""));
+    flattenFunc("flattenFunc", cl::CommaSeparated,
+                cl::desc("Insert Bogus Control Flow only for some functions: "
+                         "flattenFunc=\"func1,func2\""));
 
 static cl::opt<std::string> flattenSeed(
     "flattenSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
 static cl::opt<double>
-flattenProbability("flattenProbability", cl::init(0.5),
-                   cl::desc("Probability that a function will be split"));
+    flattenProbability("flattenProbability", cl::init(0.5),
+                       cl::desc("Probability that a function will be split"));
 
 Value *Flatten::findBlock(LLVMContext &context,
                           std::vector<BasicBlock *> &blocks,
@@ -73,7 +73,6 @@ bool Flatten::runOnModule(Module &M) {
   }
   trial.param(
       std::bernoulli_distribution::param_type((double)flattenProbability));
-
 
   bool hasBeenModified = false;
 
@@ -113,7 +112,9 @@ bool Flatten::runOnFunction(Function &F) {
   DEBUG(errs() << "\tListing and filtering blocks\n");
   // Get original list of blocks
   for (auto &block : F) {
-    DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
+    DEBUG(if (!block.hasName()) {
+      block.setName(blockPrefix + Twine(i++));
+    });
 
     DEBUG(errs() << "\tBlock " << block.getName() << "\n");
     BasicBlock::iterator inst1 = block.begin();
@@ -220,6 +221,39 @@ bool Flatten::runOnFunction(Function &F) {
   PHINode *jumpIndex = jumpBuilder.CreatePHI(Type::getInt32Ty(context),
                                              blocks.size() + 1, jumpIndexName);
 
+  DEBUG(errs() << "\tCreating jump table:\n");
+  std::vector<Constant *> blockAddresses(blocks.size());
+
+  for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
+    BasicBlock *block = blocks[i];
+    blockAddresses[i] = (Constant *)BlockAddress::get(block);
+  }
+  // Create JumpTables
+  ArrayType *jumpType =
+      ArrayType::get(Type::getInt8PtrTy(context), blocks.size());
+  Constant *jumpValues = ConstantArray::get(jumpType, blockAddresses);
+  Twine jumpTableName("");
+  DEBUG(jumpTableName = jumpTableName.concat(F.getName()).concat("_jumpTable"));
+  GlobalVariable *jumpTable = new GlobalVariable(
+      *(F.getParent()), jumpType, false, GlobalValue::PrivateLinkage,
+      jumpValues, jumpTableName);
+
+  Value *indices[2];
+  indices[0] = ConstantInt::get(Type::getInt32Ty(F.getContext()), 0, true);
+  indices[1] = jumpIndex;
+
+  // Create indirect branch
+  Twine jumpAddrPtrName("");
+  DEBUG(jumpAddrPtrName = jumpAddrPtrName.concat("jump_addr_ptr"));
+  Value *jumpAddressPtr =
+      jumpBuilder.CreateInBoundsGEP(jumpTable, indices, jumpAddrPtrName);
+  Twine jumpAddrName("");
+  DEBUG(jumpAddrName = jumpAddrName.concat("jump_addr"));
+  LoadInst *jumpAddr = jumpBuilder.CreateLoad(jumpAddressPtr, jumpAddrName);
+  IndirectBrInst *indirectBranch =
+      jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
+  assert(indirectBranch && "IndirectBranchInst cannot be null!");
+
 #if 0
     DEBUG(errs() << "\tCreating jump table:\n");
 
@@ -242,9 +276,10 @@ bool Flatten::runOnFunction(Function &F) {
         jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
     assert(indirectBranch && "IndirectBranchInst cannot be null!");
 #endif
-  SwitchInst *switchInst =
-      jumpBuilder.CreateSwitch(jumpIndex, initialBlock, blocks.size());
-  switchInst->setMetadata(metaKind, metaNode);
+
+  // SwitchInst *switchInst =
+  //     jumpBuilder.CreateSwitch(jumpIndex, initialBlock, blocks.size());
+  // switchInst->setMetadata(metaKind, metaNode);
 
   for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
     BasicBlock *block = blocks[i];
@@ -253,7 +288,8 @@ bool Flatten::runOnFunction(Function &F) {
     ConstantInt *index = ConstantInt::get(Type::getInt32Ty(context), i, false);
 
     // Using switch for now
-    switchInst->addCase(index, block);
+    // switchInst->addCase(index, block);
+    indirectBranch->addDestination(block);
 
     // Create jump index
     if (block == initialBlock) {
