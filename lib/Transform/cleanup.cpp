@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "renamer"
+#define DEBUG_TYPE "cleanup"
 #include "Transform/cleanup.h"
 #include "Transform/obf_utilities.h"
 #include "llvm/IR/GlobalValue.h"
