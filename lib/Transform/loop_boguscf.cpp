@@ -18,10 +18,49 @@
 #include "llvm/Support/CFG.h"
 
 bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
-  return false;
+  DEBUG(errs() << "LoopBogusCF: Dumping loop info\n");
+  DEBUG(loop->dump());
+
+  BasicBlock *header = loop->getHeader();
+
+  BranchInst *branch = dyn_cast<BranchInst>(header->getTerminator());
+  if (!branch || !branch->isConditional()) {
+    DEBUG(errs() << "\t Not trivial loop -- skipping\n");
+    return false;
+  }
+
+  if (!loop->isLoopSimplifyForm()) {
+    DEBUG(errs() << "\t Not simplified loop -- skipping\n");
+    return false;
+  }
+
+  BasicBlock *exit = loop->getUniqueExitBlock();
+  if (!exit) {
+    DEBUG(errs() << "\t No unique exit block -- skipping\n");
+    return false;
+  }
+
+  DEBUG(errs() << "\tCreating dummy block\n");
+  LoopInfo &info = getAnalysis<LoopInfo>();
+  // Split header block
+  BasicBlock *dummy = header->splitBasicBlock(header->getTerminator());
+  loop->addBasicBlockToLoop(dummy, info.getBase());
+
+  if (branch->getSuccessor(1) == exit) {
+    // True dummy predicate
+
+  } else {
+    // False dummy predicate
+  }
+
+  return true;
+}
+
+void LoopBogusCF::getAnalysisUsage (AnalysisUsage &AU) const {
+  AU.addRequired<LoopInfo>();
 }
 
 char LoopBogusCF::ID = 0;
-static RegisterPass<LoopBogusCF>
-    X("loop-boguscf", "Insert opaque predicate to loop headers", false,
-      false);
+static RegisterPass<LoopBogusCF> X("loop-boguscf",
+                                   "Insert opaque predicate to loop headers",
+                                   false, false);

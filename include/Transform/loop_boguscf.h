@@ -18,6 +18,7 @@ struct LoopBogusCF : public LoopPass {
 
   LoopBogusCF() : LoopPass(ID) {}
   virtual bool runOnLoop(Loop *loop, LPPassManager &LPM);
+  virtual void getAnalysisUsage (AnalysisUsage &) const;
 };
 
 #endif
