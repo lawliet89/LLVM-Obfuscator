@@ -1,5 +1,4 @@
-//=== cleanup.cpp - Obfuscation Cleanup Pass
-//==================================//
+//=== cleanup.cpp - Obfuscation Cleanup Pass =================================//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -21,7 +20,18 @@
 #include "llvm/Support/CFG.h"
 
 bool CleanupPass::runOnFunction(Function &F) {
-  return false;
+  bool hasBeenModified = false;
+  for (auto &block : F) {
+    for (auto &inst : block) {
+      hasBeenModified |=
+          ObfUtils::removeTagIfExists(inst, ObfUtils::FlattenObf);
+      hasBeenModified |=
+          ObfUtils::removeTagIfExists(inst, ObfUtils::BogusCFObf);
+      hasBeenModified |=
+          ObfUtils::removeTagIfExists(inst, ObfUtils::CopyObf);
+    }
+  }
+  return hasBeenModified;
 }
 
 char CleanupPass::ID = 0;

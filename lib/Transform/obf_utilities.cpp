@@ -75,4 +75,16 @@ void promoteAllocas(Function &F, DominatorTree &DT) {
   DT.getBase().recalculate(F);
   PromoteMemToReg(allocas, DT);
 }
+
+bool removeTagIfExists(Instruction &I, ObfType type) {
+  LLVMContext &context = I.getContext();
+  StringRef metaKindName = getMetaKindName(type);
+  unsigned metaKind = context.getMDKindID(metaKindName);
+  if (I.getMetadata(metaKind)) {
+    I.setMetadata(metaKind, nullptr);
+    return true;
+  } else {
+    return false;
+  }
+}
 };

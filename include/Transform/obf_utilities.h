@@ -33,6 +33,8 @@ void tagFunction(Function &F, ObfType type, ArrayRef<Value *> values);
 // Check if a function has been tagged as obfuscated
 MDNode *checkFunctionTagged(Function &F, ObfType type);
 
+bool removeTagIfExists(Instruction &F, ObfType type);
+
 // Promote all allocas to PHO, if possible
 void promoteAllocas(Function &F, DominatorTree &DT);
 };
