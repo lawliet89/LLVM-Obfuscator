@@ -21,7 +21,7 @@
 using namespace llvm;
 
 static cl::opt<unsigned> opaqueGlobal(
-    "opaqueGlobal", cl::init(4),
+    "opaque-global", cl::init(4),
     cl::desc("Number of global variables in a module for opaque predicates"));
 
 namespace {
