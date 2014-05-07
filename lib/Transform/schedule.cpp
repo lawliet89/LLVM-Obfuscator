@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Transform/boguscf.h"
+#include "Transform/cleanup.h"
 #include "Transform/copy.h"
 #include "Transform/flatten.h"
 #include "Transform/identifier_renamer.h"
@@ -27,6 +28,7 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new IdentifierRenamer());
 
   // Clean ups
+  PM.add(new CleanupPass());
   PM.add(createPromoteMemoryToRegisterPass());
   PM.add(createCFGSimplificationPass());
 });
