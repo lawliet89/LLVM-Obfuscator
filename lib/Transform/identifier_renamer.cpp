@@ -9,6 +9,7 @@
 #define DEBUG_TYPE "renamer"
 #include "Transform/identifier_renamer.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -17,25 +18,37 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
 
-bool IdentifierRenamer::runOnFunction(Function &F) {
-  if (F.isDeclaration())
-    return false;
-
-  DEBUG(errs() << "Renamer: Function '" << F.getName() << "'\n");
-
-  // Check linkage of function and rename if internal/private
-  GlobalValue::LinkageTypes linkage = F.getLinkage();
-  if (linkage == GlobalValue::InternalLinkage ||
-      linkage == GlobalValue::PrivateLinkage) {
-    DEBUG(errs() << "\tRemoving function name\n");
-    F.setName("");
+bool IdentifierRenamer::runOnModule(Module &M) {
+  // Rename globals if possible
+  for (auto G = M.global_begin(), GEnd = M.global_end(); G != GEnd; ++G) {
+    GlobalValue::LinkageTypes linkage = G->getLinkage();
+    if (linkage == GlobalValue::InternalLinkage ||
+        linkage == GlobalValue::PrivateLinkage) {
+      DEBUG(errs() << "\tRemoving globals\n");
+      G->setName("");
+    }
   }
 
-  DEBUG(errs() << "\tRemoving names of BasicBlocks and Values\n");
-  for (auto &block : F) {
-    block.setName("");
-    for (Instruction &inst : block) {
-      inst.setName("");
+  for (auto &F : M) {
+    if (F.isDeclaration())
+      continue;
+
+    DEBUG(errs() << "Renamer: Function '" << F.getName() << "'\n");
+
+    // Check linkage of function and rename if internal/private
+    GlobalValue::LinkageTypes linkage = F.getLinkage();
+    if (linkage == GlobalValue::InternalLinkage ||
+        linkage == GlobalValue::PrivateLinkage) {
+      DEBUG(errs() << "\tRemoving function name\n");
+      F.setName("");
+    }
+
+    DEBUG(errs() << "\tRemoving names of BasicBlocks and Values\n");
+    for (auto &block : F) {
+      block.setName("");
+      for (Instruction &inst : block) {
+        inst.setName("");
+      }
     }
   }
 
@@ -44,5 +57,5 @@ bool IdentifierRenamer::runOnFunction(Function &F) {
 
 char IdentifierRenamer::ID = 0;
 static RegisterPass<IdentifierRenamer>
-X("identifier-renamer", "Remove identifiers and function names if possible",
-  false, false);
+    X("identifier-renamer", "Remove identifiers and function names if possible",
+      false, false);
