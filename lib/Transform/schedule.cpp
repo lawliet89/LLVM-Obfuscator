@@ -26,10 +26,14 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new InlineFunctionPass());
   PM.add(new BogusCF());
   PM.add(new Flatten());
-  PM.add(new IdentifierRenamer());
+
+  PM.add(createLoopSimplifyPass());
   PM.add(new LoopBogusCF());
+
   // Clean ups
   PM.add(new CleanupPass());
   PM.add(createPromoteMemoryToRegisterPass());
   PM.add(createCFGSimplificationPass());
+
+  PM.add(new IdentifierRenamer());
 });

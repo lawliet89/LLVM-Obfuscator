@@ -32,7 +32,7 @@ typedef std::function<PredicateType()> PredicateTypeRandomner;
 // Prepare module for opaque predicates by adding global variables to the module
 // Returns a vector of pointers to the global variables generated
 // Needs at least 2 global variables
-std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number = 4);
+std::vector<GlobalVariable *> prepareModule(Module &M);
 
 // Given a BasicBlock with NO terminator, and two successor blocks
 // Generate a randomly selected opaque predicate to replace the terminator

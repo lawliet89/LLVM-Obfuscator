@@ -16,8 +16,13 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/CommandLine.h"
 #include <cassert>
 using namespace llvm;
+
+static cl::opt<unsigned> opaqueGlobal(
+    "opaqueGlobal", cl::init(4),
+    cl::desc("Number of global variables in a module for opaque predicates"));
 
 namespace {
 
@@ -177,15 +182,17 @@ Formula getFormula(OpaquePredicate::Randomner randomner) {
 };
 
 namespace OpaquePredicate {
-std::vector<GlobalVariable *> prepareModule(Module &M, unsigned number) {
-  assert(number >= 2 && "Opaque Predicates need at least 2 global variables");
-  DEBUG(errs() << "[Opaque Predicate] Creating " << number << " globals\n");
-  std::vector<GlobalVariable *> globals(number);
-  for (unsigned i = 0; i < number; ++i) {
+std::vector<GlobalVariable *> prepareModule(Module &M) {
+  assert(opaqueGlobal >= 2 &&
+         "Opaque Predicates need at least 2 global variables");
+  DEBUG(errs() << "[Opaque Predicate] Creating " << opaqueGlobal
+               << " globals\n");
+  std::vector<GlobalVariable *> globals(opaqueGlobal);
+  for (unsigned i = 0; i < opaqueGlobal; ++i) {
     Value *zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0, true);
-    GlobalVariable *global = new GlobalVariable(
-        M, Type::getInt32Ty(M.getContext()), false, GlobalValue::CommonLinkage,
-        (Constant *)zero, "");
+    GlobalVariable *global =
+        new GlobalVariable(M, Type::getInt32Ty(M.getContext()), false,
+                           GlobalValue::CommonLinkage, (Constant *)zero, "");
     assert(global && "Null globals created!");
     globals[i] = global;
   }

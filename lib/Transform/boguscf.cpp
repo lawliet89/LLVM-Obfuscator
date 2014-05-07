@@ -63,10 +63,6 @@ static cl::opt<std::string>
 bcfSeed("bcfSeed", cl::init(""),
         cl::desc("Seed for random number generator. Defaults to system time"));
 
-static cl::opt<unsigned> bcfGlobal(
-    "bcfGlobal", cl::init(4),
-    cl::desc("Number of global variables in a module for opaque predicates"));
-
 STATISTIC(NumBlocksSeen, "Number of basic blocks processed (excluding skips "
                          "due to PHI/terminator only blocks)");
 STATISTIC(NumBlocksSkipped,
@@ -106,7 +102,7 @@ bool BogusCF::runOnModule(Module &M) {
   unsigned metaKind = context.getMDKindID(metaKindName);
 
   std::vector<GlobalVariable *> globals =
-      OpaquePredicate::prepareModule(M, bcfGlobal);
+      OpaquePredicate::prepareModule(M);
   for (auto &function : M) {
     DEBUG(errs() << "\tFunction " << function.getName() << "\n");
     bool functionHasBlock = false;
