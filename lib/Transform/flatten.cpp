@@ -173,9 +173,6 @@ bool Flatten::runOnFunction(Function &F) {
     return false;
   }
 
-  MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
-  unsigned metaKind = context.getMDKindID(metaKindName);
-
   DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   // Demote all the PHI Nodes to stack
@@ -229,6 +226,7 @@ bool Flatten::runOnFunction(Function &F) {
     blockAddresses[i] = (Constant *)BlockAddress::get(block);
   }
   // Create JumpTables
+  DEBUG(errs() << "\tCreating jump table:\n");
   ArrayType *jumpType =
       ArrayType::get(Type::getInt8PtrTy(context), blocks.size());
   Constant *jumpValues = ConstantArray::get(jumpType, blockAddresses);
@@ -253,33 +251,6 @@ bool Flatten::runOnFunction(Function &F) {
   IndirectBrInst *indirectBranch =
       jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
   assert(indirectBranch && "IndirectBranchInst cannot be null!");
-
-#if 0
-    DEBUG(errs() << "\tCreating jump table:\n");
-
-    Twine jumpTableName("");
-    DEBUG(jumpTableName = jumpTableName.concat("jump_table"));
-    Value *jumpTableSize =
-        ConstantInt::get(Type::getInt32Ty(context), blocks.size(), false);
-    AllocaInst *jumpTable = entryBuilder.CreateAlloca(
-        Type::getInt8PtrTy(context), jumpTableSize, jumpTableName);
-
-    // Create indirect branch
-    Twine jumpAddrPtrName("");
-    DEBUG(jumpAddrPtrName = jumpAddrPtrName.concat("jump_addr_ptr"));
-    Value *jumpAddressPtr =
-        jumpBuilder.CreateInBoundsGEP(jumpTable, jumpIndex, jumpAddrPtrName);
-    Twine jumpAddrName("");
-    DEBUG(jumpAddrName = jumpAddrName.concat("jump_addr"));
-    LoadInst *jumpAddr = jumpBuilder.CreateLoad(jumpAddressPtr, jumpAddrName);
-    IndirectBrInst *indirectBranch =
-        jumpBuilder.CreateIndirectBr(jumpAddr, blocks.size());
-    assert(indirectBranch && "IndirectBranchInst cannot be null!");
-#endif
-
-  // SwitchInst *switchInst =
-  //     jumpBuilder.CreateSwitch(jumpIndex, initialBlock, blocks.size());
-  // switchInst->setMetadata(metaKind, metaNode);
 
   for (unsigned i = 0, iEnd = blocks.size(); i < iEnd; ++i) {
     BasicBlock *block = blocks[i];
@@ -328,6 +299,8 @@ bool Flatten::runOnFunction(Function &F) {
 
         terminator->eraseFromParent();
         BranchInst::Create(jumpBlock, block);
+
+        // Disabled because Invoke edges are not supported in promoting PHI
 #if 0
         } else if (InvokeInst *invoke = dyn_cast<InvokeInst>(terminator)) {
           // InvokeInst
@@ -345,15 +318,6 @@ bool Flatten::runOnFunction(Function &F) {
         llvm_unreachable("Unexpected TerminatorInst encountered!");
       }
     }
-
-#if 0
-      // Add to jump table
-      Value *ptr = entryBuilder.CreateInBoundsGEP(jumpTable, index);
-      BlockAddress *blockAddress = BlockAddress::get(block);
-      entryBuilder.CreateStore((Value *)blockAddress, ptr);
-
-      indirectBranch->addDestination(block);
-#endif
 
 #if 0
       // Move all PHI Nodes to jumpBlock
@@ -410,7 +374,6 @@ bool Flatten::runOnFunction(Function &F) {
     }
   }
 
-  // assert(jumpTable->isArrayAllocation() && "Jump table should be static!");
   entryBuilder.CreateBr(jumpBlock);
 
   // Iterate through PHINodes of jumpBlock and assign NULL values or other
@@ -440,31 +403,6 @@ bool Flatten::runOnFunction(Function &F) {
   ObfUtils::tagFunction(F, ObfUtils::FlattenObf);
   return true;
 }
-
-// TODO: Use jump tables
-#if 0
-  // Replace switch with jump tables
-  virtual bool doFinalization(Module &M) {
-    bool modified = false;
-    DEBUG(errs() << "Finalising: Creating jump tables\n");
-    LLVMContext &context = M.getContext();
-    unsigned metaKind = context.getMDKindID(metaKindName);
-    for (auto &function : M) {
-      DEBUG(errs() << "\tFunction " << function.getName() << "\n");
-      bool functionHasBlock = false;
-      for (auto &block : function) {
-        TerminatorInst *terminator = block.getTerminator();
-        if (terminator->getMetadata(metaKind)) {
-          functionHasBlock = true;
-          DEBUG(errs() << "\t\tJump block found\n");
-        }
-      }
-      modified |= functionHasBlock;
-    }
-
-    return modified;
-  }
-#endif
 
 bool Flatten::isEligible(Function &F) {
   DEBUG(errs() << "Flatten: Checking " << F.getName() << " eligibility:\n");
