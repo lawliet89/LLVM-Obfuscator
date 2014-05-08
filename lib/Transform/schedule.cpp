@@ -13,6 +13,7 @@
 #include "Transform/identifier_renamer.h"
 #include "Transform/inline_function.h"
 #include "Transform/loop_boguscf.h"
+#include "Transform/opaque_predicate.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -25,6 +26,7 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new Copy());
   PM.add(new InlineFunctionPass());
   PM.add(new BogusCF());
+  PM.add(new OpaquePredicate());
   PM.add(new Flatten());
 
   PM.add(createLoopSimplifyPass());

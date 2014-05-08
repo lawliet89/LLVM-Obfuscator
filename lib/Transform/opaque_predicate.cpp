@@ -44,9 +44,53 @@ bool OpaquePredicate::runOnModule(Module &M) {
   // Create globals
   std::vector<GlobalVariable *> globals = prepareModule(M);
 
+  std::uniform_int_distribution<int> distribution;
+  std::uniform_int_distribution<int> distributionType(0, 1);
   for (auto &function : M) {
     DEBUG(errs() << "\tFunction " << function.getName() << "\n");
-    bool functionHasBlock = false;
+    for (auto &block : function) {
+      TerminatorInst *terminator = block.getTerminator();
+      PredicateType type = getInstructionType(*terminator);
+
+      if (type == PredicateNone) {
+        continue;
+      }
+      DEBUG(errs() << "\t\tFound: " << type << "\n");
+      assert(type != PredicateIndeterminate &&
+             "Indeterminate predicate not supported yet");
+
+      // Clear terminator and its condition
+      BranchInst *branch = dyn_cast<BranchInst>(terminator);
+      assert(branch && "Terminator is not a branch!");
+      FCmpInst *condition = dyn_cast<FCmpInst>(branch->getCondition());
+      assert(condition && "Condition is missing!");
+
+      BasicBlock *trueBlock = branch->getSuccessor(0);
+      BasicBlock *falseBlock = branch->getSuccessor(1);
+
+      branch->eraseFromParent();
+      condition->eraseFromParent();
+
+      if (type == PredicateTrue) {
+        createTrue(&block, trueBlock, falseBlock, globals, [&]{
+          return distribution(engine);
+        });
+      } else if (type == PredicateFalse) {
+        createFalse(&block, trueBlock, falseBlock, globals, [&]{
+          return distribution(engine);
+        });
+      } else {
+        PredicateType type = create(&block, trueBlock, falseBlock, globals, [&]{
+          return distribution(engine);
+        },
+                                    [&]()->OpaquePredicate::PredicateType{
+          return static_cast<OpaquePredicate::PredicateType>(
+              distributionType(engine));
+        });
+        DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
+      }
+      DEBUG_WITH_TYPE("opaque_cfg", function.viewCFG());
+    }
   }
   return true;
 }
@@ -210,10 +254,12 @@ std::vector<GlobalVariable *> OpaquePredicate::prepareModule(Module &M) {
                << " globals\n");
   std::vector<GlobalVariable *> globals(opaqueGlobal);
   for (unsigned i = 0; i < opaqueGlobal; ++i) {
+    Twine globalName("global_");
+    globalName = globalName.concat(Twine(i));
     Value *zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0, true);
-    GlobalVariable *global =
-        new GlobalVariable(M, Type::getInt32Ty(M.getContext()), false,
-                           GlobalValue::CommonLinkage, (Constant *)zero, "");
+    GlobalVariable *global = new GlobalVariable(
+        M, Type::getInt32Ty(M.getContext()), false, GlobalValue::CommonLinkage,
+        (Constant *)zero, globalName);
     assert(global && "Null globals created!");
     globals[i] = global;
   }
@@ -249,6 +295,10 @@ void OpaquePredicate::createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
   GlobalVariable *x = globals[randomner() % globals.size()];
   GlobalVariable *y = globals[randomner() % globals.size()];
 
+  while (x == y) {
+    y = globals[randomner() % globals.size()];
+  }
+
   // Advance our x and y
   Value *x1 = advanceGlobal(headBlock, x, randomner);
   Value *y1 = advanceGlobal(headBlock, y, randomner);
@@ -267,6 +317,10 @@ void OpaquePredicate::createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
   // Get our x and y
   GlobalVariable *x = globals[abs(randomner()) % globals.size()];
   GlobalVariable *y = globals[abs(randomner()) % globals.size()];
+
+  while (x == y) {
+    y = globals[randomner() % globals.size()];
+  }
 
   // Advance our x and y
   Value *x1 = advanceGlobal(headBlock, x, randomner);
@@ -360,6 +414,9 @@ raw_ostream &operator<<(raw_ostream &stream,
     break;
   case OpaquePredicate::PredicateIndeterminate:
     stream << "Indeterminate";
+    break;
+  case OpaquePredicate::PredicateRandom:
+    stream << "Random";
     break;
   default:
     llvm_unreachable("Unknown type of predicate");
