@@ -23,19 +23,29 @@ using namespace llvm;
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
+
+  // First batch of passes are trivial passes and should be run first to
+  // "maximise confusion" that the later passes will introduce
   PM.add(new Copy());
   PM.add(new InlineFunctionPass());
-  PM.add(new BogusCF());
-  PM.add(new OpaquePredicate());
-  PM.add(new Flatten());
 
+  // Second batch of passes deal with introducing new control flow paths
+  // These passes will insert stub 1.00 == 1.00 branches
+  // which will be cleaned up by the OpaquePredicate pass
+  // OpaquePredicate pass MUST be run before Flatten Pass because Flatten
+  // will REMOVE the original branch instructions
+  PM.add(new BogusCF());
   PM.add(createLoopSimplifyPass());
   PM.add(new LoopBogusCF());
+  PM.add(new OpaquePredicate());
+
+  // Flatten the control flow
+  PM.add(new Flatten());
 
   // Clean ups
-  PM.add(new CleanupPass());
-  PM.add(createPromoteMemoryToRegisterPass());
-  PM.add(createCFGSimplificationPass());
+  PM.add(new CleanupPass()); // Remove stray metadata left over from passes
+  PM.add(createPromoteMemoryToRegisterPass()); // Fix PHI demotions
+  PM.add(createCFGSimplificationPass()); // Further cleanups
 
   PM.add(new IdentifierRenamer());
 });
