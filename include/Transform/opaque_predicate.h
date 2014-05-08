@@ -36,7 +36,8 @@ struct OpaquePredicate : public ModulePass {
 
   static char ID;
   std::minstd_rand engine;
-  static StringRef metaKindName;
+  static StringRef stubName;
+  static StringRef unreachableName;
 
   OpaquePredicate() : ModulePass(ID) {}
   virtual bool runOnModule(Module &M);
@@ -44,6 +45,8 @@ struct OpaquePredicate : public ModulePass {
   static void createStub(BasicBlock *block, BasicBlock *trueBlock,
                          BasicBlock *falseBlock,
                          PredicateType type = PredicateRandom);
+
+  static bool isBasicBlockUnreachable(BasicBlock &block);
 
 private:
   // Prepare module for opaque predicates by adding global variables to the
@@ -108,9 +111,10 @@ private:
       llvm_unreachable("Unknown type");
     }
   }
-  static void tagInstruction(Instruction &inst,
+  static void tagInstruction(Instruction &inst, StringRef metaKindName,
                              PredicateType type = PredicateRandom);
-  static PredicateType getInstructionType(TerminatorInst &inst);
+  static PredicateType getInstructionType(TerminatorInst &inst,
+                                          StringRef metaKindName);
 };
 
 // Overloads for PredicateType

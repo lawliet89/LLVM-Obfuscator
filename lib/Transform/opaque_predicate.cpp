@@ -50,7 +50,7 @@ bool OpaquePredicate::runOnModule(Module &M) {
     DEBUG(errs() << "\tFunction " << function.getName() << "\n");
     for (auto &block : function) {
       TerminatorInst *terminator = block.getTerminator();
-      PredicateType type = getInstructionType(*terminator);
+      PredicateType type = getInstructionType(*terminator, stubName);
 
       if (type == PredicateNone) {
         continue;
@@ -71,24 +71,40 @@ bool OpaquePredicate::runOnModule(Module &M) {
       branch->eraseFromParent();
       condition->eraseFromParent();
 
+      PredicateType createdType;
       if (type == PredicateTrue) {
         createTrue(&block, trueBlock, falseBlock, globals, [&]{
           return distribution(engine);
         });
+        createdType = PredicateTrue;
       } else if (type == PredicateFalse) {
         createFalse(&block, trueBlock, falseBlock, globals, [&]{
           return distribution(engine);
         });
+        createdType = PredicateTrue;
       } else {
-        PredicateType type = create(&block, trueBlock, falseBlock, globals, [&]{
+        createdType = create(&block, trueBlock, falseBlock, globals, [&]{
           return distribution(engine);
         },
-                                    [&]()->OpaquePredicate::PredicateType{
+                             [&]()->OpaquePredicate::PredicateType{
           return static_cast<OpaquePredicate::PredicateType>(
               distributionType(engine));
         });
-        DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
+        DEBUG(errs() << "\t\tOpaque Predicate Created: " << createdType
+                     << "\n");
       }
+
+      switch (createdType) {
+      case PredicateTrue:
+        tagInstruction(*(falseBlock->begin()), unreachableName, PredicateTrue);
+        break;
+      case PredicateFalse:
+        tagInstruction(*(trueBlock->begin()), unreachableName, PredicateFalse);
+        break;
+      default:
+        llvm_unreachable("Unsupported predicate type");
+      }
+
       DEBUG_WITH_TYPE("opaque_cfg", function.viewCFG());
     }
   }
@@ -348,10 +364,10 @@ void OpaquePredicate::createStub(BasicBlock *block, BasicBlock *trueBlock,
   // Bogus conditional branch
   BranchInst *branch =
       BranchInst::Create(trueBlock, falseBlock, (Value *)condition, block);
-  tagInstruction(*branch, type);
+  tagInstruction(*branch, stubName, type);
 }
 
-void OpaquePredicate::tagInstruction(Instruction &inst,
+void OpaquePredicate::tagInstruction(Instruction &inst, StringRef metaKindName,
                                      OpaquePredicate::PredicateType type) {
   LLVMContext &context = inst.getContext();
   unsigned metaKind = context.getMDKindID(metaKindName);
@@ -361,7 +377,8 @@ void OpaquePredicate::tagInstruction(Instruction &inst,
 }
 
 OpaquePredicate::PredicateType
-OpaquePredicate::getInstructionType(TerminatorInst &inst) {
+OpaquePredicate::getInstructionType(TerminatorInst &inst,
+                                    StringRef metaKindName) {
   LLVMContext &context = inst.getContext();
   unsigned metaKind = context.getMDKindID(metaKindName);
 
@@ -425,7 +442,8 @@ raw_ostream &operator<<(raw_ostream &stream,
   return stream;
 }
 
-StringRef OpaquePredicate::metaKindName("opaque_stub");
+StringRef OpaquePredicate::stubName("opaque_stub");
+StringRef OpaquePredicate::unreachableName("opaque_unreachable");
 char OpaquePredicate::ID = 0;
 static RegisterPass<OpaquePredicate>
     X("opaque-predicate", "Replace stub branch with opaque predicates", false,
