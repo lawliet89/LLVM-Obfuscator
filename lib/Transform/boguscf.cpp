@@ -51,17 +51,17 @@
 #include <chrono>
 
 static cl::list<std::string>
-bcfFunc("bcfFunc", cl::CommaSeparated,
-        cl::desc("Insert Bogus Control Flow only for some functions: "
-                 "bcfFunc=\"func1,func2\""));
+    bcfFunc("bcfFunc", cl::CommaSeparated,
+            cl::desc("Insert Bogus Control Flow only for some functions: "
+                     "bcfFunc=\"func1,func2\""));
 
 static cl::opt<double>
-bcfProbability("bcfProbability", cl::init(0.2),
-               cl::desc("Probability that a basic block will be split"));
+    bcfProbability("bcfProbability", cl::init(0.2),
+                   cl::desc("Probability that a basic block will be split"));
 
-static cl::opt<std::string>
-bcfSeed("bcfSeed", cl::init(""),
-        cl::desc("Seed for random number generator. Defaults to system time"));
+static cl::opt<std::string> bcfSeed(
+    "bcfSeed", cl::init(""),
+    cl::desc("Seed for random number generator. Defaults to system time"));
 
 STATISTIC(NumBlocksSeen, "Number of basic blocks processed (excluding skips "
                          "due to PHI/terminator only blocks)");
@@ -93,6 +93,7 @@ bool BogusCF::runOnModule(Module &M) {
   if (!hasBeenModified)
     return false;
 
+#if 0
   DEBUG(errs() << "Finalising: Creating Opaque Predicates\n");
 
   std::uniform_int_distribution<int> distribution;
@@ -140,6 +141,7 @@ bool BogusCF::runOnModule(Module &M) {
       }
     }
   }
+#endif
   DEBUG(errs() << "BogusCF: Done.\n");
   return true;
 }
@@ -184,9 +186,9 @@ bool BogusCF::runOnFunction(Function &F) {
   // Get original list of blocks
   for (auto &block : F) {
     DEBUG(if (!block.hasName()) {
-                block.setName(blockPrefix + Twine(i++));
-                hasBeenModified |= true;
-              });
+      block.setName(blockPrefix + Twine(i++));
+      hasBeenModified |= true;
+    });
 
     DEBUG(errs() << "\tBlock " << block.getName() << "\n");
     for (auto &inst : block) {
@@ -240,10 +242,6 @@ bool BogusCF::runOnFunction(Function &F) {
   for (auto phi : phis) {
     DemotePHIToStack(phi);
   }
-
-  LLVMContext &context = F.getContext();
-  MDNode *metaNode = MDNode::get(context, MDString::get(context, metaKindName));
-  unsigned metaKind = context.getMDKindID(metaKindName);
 
   DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
@@ -466,18 +464,7 @@ bool BogusCF::runOnFunction(Function &F) {
     // Clear the unconditional branch from the "husk" original block
     block->getTerminator()->eraseFromParent();
 
-    // Create Opaque Predicate - will turn them into "real ones" in
-    // do finalization
-    // Always true for now
-    Value *lhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
-    Value *rhs = ConstantFP::get(Type::getFloatTy(F.getContext()), 1.0);
-    FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
-
-    // Bogus conditional branch
-    BranchInst *branch =
-        BranchInst::Create(originalBlock, copyBlock, (Value *)condition, block);
-    branch->setMetadata(metaKind, metaNode);
-
+    OpaquePredicate::createStub(block, originalBlock, copyBlock);
     hasBeenModified |= true;
   }
   DEBUG_WITH_TYPE("cfg", F.viewCFG());
@@ -531,4 +518,5 @@ bool BogusCF::isEligible(Function &F) {
 
 char BogusCF::ID = 0;
 static RegisterPass<BogusCF>
-X("boguscf", "Insert bogus control flow paths into basic blocks", false, false);
+    X("boguscf", "Insert bogus control flow paths into basic blocks", false,
+      false);

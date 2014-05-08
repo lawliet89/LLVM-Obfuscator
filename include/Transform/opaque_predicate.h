@@ -11,7 +11,8 @@
 
 #ifndef OPAQUE_PREDICATE_H
 #define OPAQUE_PREDICATE_H
-
+#include "llvm/Pass.h"
+#include "llvm/PassManager.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
@@ -19,47 +20,97 @@
 #include <vector>
 using namespace llvm;
 
-namespace OpaquePredicate {
-enum PredicateType {
-  PredicateFalse = 0x0,
-  PredicateTrue = 0x1,
-  PredicateIndeterminate = 0x2
-};
+struct OpaquePredicate : public ModulePass {
+  enum PredicateType {
+    PredicateFalse = 0x0,
+    PredicateTrue = 0x1,
+    PredicateIndeterminate = 0x2,
+    PredicateRandom = 0x3,
+    PredicateNone = 0xFF
+  };
 
-typedef std::function<int()> Randomner;
-typedef std::function<PredicateType()> PredicateTypeRandomner;
+  typedef std::function<Value *(BasicBlock *, Value *, Value *,
+                                OpaquePredicate::PredicateType)> Formula;
+  typedef std::function<int()> Randomner;
+  typedef std::function<PredicateType()> PredicateTypeRandomner;
 
-// Prepare module for opaque predicates by adding global variables to the module
-// Returns a vector of pointers to the global variables generated
-// Needs at least 2 global variables
-std::vector<GlobalVariable *> prepareModule(Module &M);
+  static char ID;
+  std::minstd_rand engine;
+  static StringRef metaKindName;
 
-// Given a BasicBlock with NO terminator, and two successor blocks
-// Generate a randomly selected opaque predicate to replace the terminator
-// and then branch to the given blocks
-// Returns the type of predicate produced
-PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
-                     BasicBlock *falseBlock,
-                     const std::vector<GlobalVariable *> &globals,
-                     Randomner randomner, PredicateTypeRandomner typeRand);
+  OpaquePredicate() : ModulePass(ID) {}
+  virtual bool runOnModule(Module &M);
 
-// Given a BasicBlock with NO terminator, and two successor blocks
-// Generate an always true opaque predicate to replace the terminator
-// and then branch to the given blocks
-// Returns the type of predicate produced
-void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
-                BasicBlock *falseBlock,
-                const std::vector<GlobalVariable *> &globals,
-                Randomner randomner);
+  static void createStub(BasicBlock *block, BasicBlock *trueBlock,
+                         BasicBlock *falseBlock,
+                         PredicateType type = PredicateRandom);
 
-// Given a BasicBlock with NO terminator, and two successor blocks
-// Generate an always false opaque predicate to replace the terminator
-// and then branch to the given blocks
-// Returns the type of predicate produced
-void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
-                 BasicBlock *falseBlock,
-                 const std::vector<GlobalVariable *> &globals,
-                 Randomner randomner);
+private:
+  // Prepare module for opaque predicates by adding global variables to the
+  // module
+  // Returns a vector of pointers to the global variables generated
+  // Needs at least 2 global variables
+  static std::vector<GlobalVariable *> prepareModule(Module &M);
+
+  // Given a BasicBlock with NO terminator, and two successor blocks
+  // Generate a randomly selected opaque predicate to replace the terminator
+  // and then branch to the given blocks
+  // Returns the type of predicate produced
+  static PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
+                              BasicBlock *falseBlock,
+                              const std::vector<GlobalVariable *> &globals,
+                              Randomner randomner,
+                              PredicateTypeRandomner typeRand);
+
+  // Given a BasicBlock with NO terminator, and two successor blocks
+  // Generate an always true opaque predicate to replace the terminator
+  // and then branch to the given blocks
+  // Returns the type of predicate produced
+  static void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
+                         BasicBlock *falseBlock,
+                         const std::vector<GlobalVariable *> &globals,
+                         Randomner randomner);
+
+  // Given a BasicBlock with NO terminator, and two successor blocks
+  // Generate an always false opaque predicate to replace the terminator
+  // and then branch to the given blocks
+  // Returns the type of predicate produced
+  static void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
+                          BasicBlock *falseBlock,
+                          const std::vector<GlobalVariable *> &globals,
+                          Randomner randomner);
+
+  static Value *formula0(BasicBlock *block, Value *x1, Value *y1,
+                         OpaquePredicate::PredicateType type);
+
+  static Value *formula1(BasicBlock *block, Value *x1, Value *y1,
+                         OpaquePredicate::PredicateType type);
+
+  static Value *formula2(BasicBlock *block, Value *x1, Value *y1,
+                         OpaquePredicate::PredicateType type);
+
+  static Formula getFormula(OpaquePredicate::Randomner randomner);
+
+  static Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
+                              OpaquePredicate::Randomner randomner);
+
+  static StringRef getStringRef(PredicateType type) {
+    switch (type) {
+    case PredicateFalse:
+      return StringRef("false");
+    case PredicateTrue:
+      return StringRef("true");
+    case PredicateIndeterminate:
+      return StringRef("indeterminate");
+    case PredicateRandom:
+      return StringRef("random");
+    default:
+      llvm_unreachable("Unknown type");
+    }
+  }
+  static void tagInstruction(Instruction &inst,
+                             PredicateType type = PredicateRandom);
+  static PredicateType getInstructionType(TerminatorInst &inst);
 };
 
 // Overloads for PredicateType

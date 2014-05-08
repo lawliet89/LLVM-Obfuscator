@@ -22,8 +22,7 @@ enum ObfType {
   NoneObf,
   BogusCFObf,
   FlattenObf,
-  CopyObf,
-  OpaqueGlobal
+  CopyObf
 };
 
 // Tag a function as "obfuscated" - this can be useful for mutually exclusive

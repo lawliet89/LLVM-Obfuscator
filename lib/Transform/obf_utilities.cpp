@@ -25,8 +25,6 @@ StringRef getMetaKindName(ObfUtils::ObfType type) {
     return StringRef("obf_flatten");
   case ObfUtils::CopyObf:
     return StringRef("obf_copy");
-  case ObfUtils::OpaqueGlobal:
-    return StringRef("opaque_global");
   default:
     llvm_unreachable("Unknown obfuscation type");
   }

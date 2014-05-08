@@ -14,9 +14,12 @@
 #include "Transform/opaque_predicate.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
+#include <chrono>
+#include <random>
 #include <cassert>
 using namespace llvm;
 
@@ -24,14 +27,33 @@ static cl::opt<unsigned> opaqueGlobal(
     "opaque-global", cl::init(4),
     cl::desc("Number of global variables in a module for opaque predicates"));
 
-namespace {
+static cl::opt<std::string> opaqueSeed(
+    "opaque-seed", cl::init(""),
+    cl::desc("Seed for random number generator. Defaults to system time"));
 
-typedef std::function<Value *(BasicBlock *, Value *, Value *,
-                              OpaquePredicate::PredicateType)> Formula;
+bool OpaquePredicate::runOnModule(Module &M) {
+  // Seed engine and create distribution
+  if (!opaqueSeed.empty()) {
+    std::seed_seq seed(opaqueSeed.begin(), opaqueSeed.end());
+    engine.seed(seed);
+  } else {
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    engine.seed(seed);
+  }
+
+  // Create globals
+  std::vector<GlobalVariable *> globals = prepareModule(M);
+
+  for (auto &function : M) {
+    DEBUG(errs() << "\tFunction " << function.getName() << "\n");
+    bool functionHasBlock = false;
+  }
+  return true;
+}
 
 // TODO: Use some runtime randomniser? Maybe?
-Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
-                     OpaquePredicate::Randomner randomner) {
+Value *OpaquePredicate::advanceGlobal(BasicBlock *block, GlobalVariable *global,
+                                      OpaquePredicate::Randomner randomner) {
   assert(global && "Null global pointer");
   DEBUG(errs() << "[Opaque Predicate] Randomly advancing global\n");
   DEBUG(errs() << "\tCreating Random Constant\n");
@@ -48,8 +70,8 @@ Value *advanceGlobal(BasicBlock *block, GlobalVariable *global,
 }
 
 // 7y^2 -1 != x^2 for all x, y in Z
-Value *formula0(BasicBlock *block, Value *x1, Value *y1,
-                OpaquePredicate::PredicateType type) {
+Value *OpaquePredicate::formula0(BasicBlock *block, Value *x1, Value *y1,
+                                 OpaquePredicate::PredicateType type) {
 
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 0 does not support indeterminate!");
@@ -84,8 +106,8 @@ Value *formula0(BasicBlock *block, Value *x1, Value *y1,
 }
 
 // (x^3 - x) % 3 == 0 for all x in Z
-Value *formula1(BasicBlock *block, Value *x1, Value *y1,
-                OpaquePredicate::PredicateType type) {
+Value *OpaquePredicate::formula1(BasicBlock *block, Value *x1, Value *y1,
+                                 OpaquePredicate::PredicateType type) {
   // y1 is unused
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 1 does not support indeterminate!");
@@ -125,8 +147,8 @@ Value *formula1(BasicBlock *block, Value *x1, Value *y1,
 }
 
 // x % 2 == 0 || (x^2 - 1) % 8 == 0 for all x in Z
-Value *formula2(BasicBlock *block, Value *x1, Value *y1,
-                OpaquePredicate::PredicateType type) {
+Value *OpaquePredicate::formula2(BasicBlock *block, Value *x1, Value *y1,
+                                 OpaquePredicate::PredicateType type) {
   // y1 is unused
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 2 does not support indeterminate!");
@@ -172,17 +194,16 @@ Value *formula2(BasicBlock *block, Value *x1, Value *y1,
     return BinaryOperator::CreateNot(condition, "", block);
 }
 
-Formula getFormula(OpaquePredicate::Randomner randomner) {
+OpaquePredicate::Formula
+OpaquePredicate::getFormula(OpaquePredicate::Randomner randomner) {
   static const int number = 3;
   static Formula formales[number] = { formula0, formula1, formula2 };
   int n = randomner() % number;
   DEBUG(errs() << "[Opaque Predicate] Formula " << n << "\n");
   return formales[n];
 }
-};
 
-namespace OpaquePredicate {
-std::vector<GlobalVariable *> prepareModule(Module &M) {
+std::vector<GlobalVariable *> OpaquePredicate::prepareModule(Module &M) {
   assert(opaqueGlobal >= 2 &&
          "Opaque Predicates need at least 2 global variables");
   DEBUG(errs() << "[Opaque Predicate] Creating " << opaqueGlobal
@@ -199,10 +220,11 @@ std::vector<GlobalVariable *> prepareModule(Module &M) {
   return globals;
 }
 
-PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
-                     BasicBlock *falseBlock,
-                     const std::vector<GlobalVariable *> &globals,
-                     Randomner randomner, PredicateTypeRandomner typeRand) {
+OpaquePredicate::PredicateType
+OpaquePredicate::create(BasicBlock *headBlock, BasicBlock *trueBlock,
+                        BasicBlock *falseBlock,
+                        const std::vector<GlobalVariable *> &globals,
+                        Randomner randomner, PredicateTypeRandomner typeRand) {
 
   PredicateType type = typeRand();
   switch (type) {
@@ -219,10 +241,10 @@ PredicateType create(BasicBlock *headBlock, BasicBlock *trueBlock,
   return type;
 }
 
-void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
-                BasicBlock *falseBlock,
-                const std::vector<GlobalVariable *> &globals,
-                Randomner randomner) {
+void OpaquePredicate::createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
+                                 BasicBlock *falseBlock,
+                                 const std::vector<GlobalVariable *> &globals,
+                                 OpaquePredicate::Randomner randomner) {
   // Get our x and y
   GlobalVariable *x = globals[randomner() % globals.size()];
   GlobalVariable *y = globals[randomner() % globals.size()];
@@ -238,10 +260,10 @@ void createTrue(BasicBlock *headBlock, BasicBlock *trueBlock,
   BranchInst::Create(trueBlock, falseBlock, condition, headBlock);
 }
 
-void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
-                 BasicBlock *falseBlock,
-                 const std::vector<GlobalVariable *> &globals,
-                 Randomner randomner) {
+void OpaquePredicate::createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
+                                  BasicBlock *falseBlock,
+                                  const std::vector<GlobalVariable *> &globals,
+                                  OpaquePredicate::Randomner randomner) {
   // Get our x and y
   GlobalVariable *x = globals[abs(randomner()) % globals.size()];
   GlobalVariable *y = globals[abs(randomner()) % globals.size()];
@@ -256,7 +278,76 @@ void createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
   // Branch
   BranchInst::Create(trueBlock, falseBlock, condition, headBlock);
 }
-};
+
+void OpaquePredicate::createStub(BasicBlock *block, BasicBlock *trueBlock,
+                                 BasicBlock *falseBlock,
+                                 OpaquePredicate::PredicateType type) {
+  // Check if basic block has a terminator, if so, remove it
+  if (block->getTerminator()) {
+    block->getTerminator()->eraseFromParent();
+  }
+
+  Value *lhs = ConstantFP::get(Type::getFloatTy(block->getContext()), 1.0);
+  Value *rhs = ConstantFP::get(Type::getFloatTy(block->getContext()), 1.0);
+  FCmpInst *condition = new FCmpInst(*block, FCmpInst::FCMP_TRUE, lhs, rhs);
+
+  // Bogus conditional branch
+  BranchInst *branch =
+      BranchInst::Create(trueBlock, falseBlock, (Value *)condition, block);
+  tagInstruction(*branch, type);
+}
+
+void OpaquePredicate::tagInstruction(Instruction &inst,
+                                     OpaquePredicate::PredicateType type) {
+  LLVMContext &context = inst.getContext();
+  unsigned metaKind = context.getMDKindID(metaKindName);
+  MDNode *metaNode =
+      MDNode::get(context, MDString::get(context, getStringRef(type)));
+  inst.setMetadata(metaKind, metaNode);
+}
+
+OpaquePredicate::PredicateType
+OpaquePredicate::getInstructionType(TerminatorInst &inst) {
+  LLVMContext &context = inst.getContext();
+  unsigned metaKind = context.getMDKindID(metaKindName);
+
+  MDNode *meta = inst.getMetadata(metaKind);
+
+  if (!meta) {
+    return PredicateNone;
+  }
+
+  // Checks
+  BranchInst *branch = dyn_cast<BranchInst>(&inst);
+  assert(branch && "Terminator should be a branch!");
+  assert(branch->isConditional() && "Stub terminator should be conditional!");
+
+  Value *condition = branch->getCondition();
+  FCmpInst *compare = dyn_cast<FCmpInst>(condition);
+  assert(compare && "Stub condition should be FCmpInst");
+  assert(compare->getNumOperands() == 2 &&
+         "Penultimate instruction should have two operands");
+  assert(compare->getPredicate() == FCmpInst::FCMP_TRUE &&
+         "Penultimate instruction should have an always true predicate");
+
+  assert(meta->getNumOperands() == 1 && "Meta node should only have 1 operand");
+
+  MDString *mdstring = dyn_cast<MDString>(meta->getOperand(0));
+  assert(mdstring && "MDNode Value should be of type MDString!");
+
+  StringRef str = mdstring->getString();
+  if (str == getStringRef(PredicateFalse)) {
+    return PredicateFalse;
+  } else if (str == getStringRef(PredicateTrue)) {
+    return PredicateTrue;
+  } else if (str == getStringRef(PredicateIndeterminate)) {
+    return PredicateIndeterminate;
+  } else if (str == getStringRef(PredicateRandom)) {
+    return PredicateRandom;
+  } else {
+    llvm_unreachable("Unknown type");
+  }
+}
 
 raw_ostream &operator<<(raw_ostream &stream,
                         const OpaquePredicate::PredicateType &o) {
@@ -276,3 +367,9 @@ raw_ostream &operator<<(raw_ostream &stream,
 
   return stream;
 }
+
+StringRef OpaquePredicate::metaKindName("opaque_stub");
+char OpaquePredicate::ID = 0;
+static RegisterPass<OpaquePredicate>
+    X("opaque-predicate", "Replace stub branch with opaque predicates", false,
+      false);

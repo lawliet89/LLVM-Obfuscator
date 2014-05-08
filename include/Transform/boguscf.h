@@ -19,9 +19,8 @@ struct BogusCF : public ModulePass {
   static char ID;
   std::minstd_rand engine;
   std::bernoulli_distribution trial;
-  StringRef metaKindName;
 
-  BogusCF() : ModulePass(ID), metaKindName("opaqueStub") {}
+  BogusCF() : ModulePass(ID) {}
 
   // Initialise and check options
   virtual bool runOnModule(Module &M);
