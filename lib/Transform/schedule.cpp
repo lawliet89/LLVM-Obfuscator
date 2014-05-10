@@ -14,6 +14,7 @@
 #include "Transform/inline_function.h"
 #include "Transform/loop_boguscf.h"
 #include "Transform/opaque_predicate.h"
+#include "Transform/replace_instruction.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -38,6 +39,9 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(createLoopSimplifyPass());
   PM.add(new LoopBogusCF());
   PM.add(new OpaquePredicate());
+
+  // The next pass will obfuscated unreachable blocks by introducing junk
+  PM.add(new ReplaceInstruction());
 
   // Flatten the control flow
   PM.add(new Flatten());

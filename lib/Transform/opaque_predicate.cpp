@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "opaque"
 #include "Transform/opaque_predicate.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
@@ -418,6 +419,15 @@ OpaquePredicate::getInstructionType(TerminatorInst &inst,
   } else {
     llvm_unreachable("Unknown type");
   }
+}
+
+bool OpaquePredicate::isBasicBlockUnreachable(BasicBlock &block) {
+  Instruction &inst = *(block.begin());
+  TerminatorInst *terminator = dyn_cast<TerminatorInst>(&inst);
+  if (getInstructionType(*terminator, unreachableName) != PredicateNone)
+    return true;
+  else
+    return false;
 }
 
 raw_ostream &operator<<(raw_ostream &stream,
