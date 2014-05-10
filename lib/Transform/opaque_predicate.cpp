@@ -51,26 +51,34 @@ bool OpaquePredicate::runOnModule(Module &M) {
     DEBUG(errs() << "\tFunction " << function.getName() << "\n");
     for (auto &block : function) {
       TerminatorInst *terminator = block.getTerminator();
-      PredicateType type = getInstructionType(*terminator, stubName);
 
+      PredicateType type = getInstructionType(*terminator, stubName);
       if (type == PredicateNone) {
         continue;
       }
+
+      BranchInst *branch = dyn_cast<BranchInst>(terminator);
+      assert(branch && "Terminator should be a branch!");
+      assert(branch->isConditional() &&
+             "Stub terminator should be conditional!");
+
+      Value *condition = branch->getCondition();
+      FCmpInst *compare = dyn_cast<FCmpInst>(condition);
+      assert(compare && "Stub condition should be FCmpInst");
+      assert(compare->getNumOperands() == 2 &&
+             "Penultimate instruction should have two operands");
+      assert(compare->getPredicate() == FCmpInst::FCMP_TRUE &&
+             "Penultimate instruction should have an always true predicate");
+
       DEBUG(errs() << "\t\tFound: " << type << "\n");
       assert(type != PredicateIndeterminate &&
              "Indeterminate predicate not supported yet");
-
-      // Clear terminator and its condition
-      BranchInst *branch = dyn_cast<BranchInst>(terminator);
-      assert(branch && "Terminator is not a branch!");
-      FCmpInst *condition = dyn_cast<FCmpInst>(branch->getCondition());
-      assert(condition && "Condition is missing!");
 
       BasicBlock *trueBlock = branch->getSuccessor(0);
       BasicBlock *falseBlock = branch->getSuccessor(1);
 
       branch->eraseFromParent();
-      condition->eraseFromParent();
+      compare->eraseFromParent();
 
       PredicateType createdType;
       if (type == PredicateTrue) {
@@ -378,8 +386,7 @@ void OpaquePredicate::tagInstruction(Instruction &inst, StringRef metaKindName,
 }
 
 OpaquePredicate::PredicateType
-OpaquePredicate::getInstructionType(TerminatorInst &inst,
-                                    StringRef metaKindName) {
+OpaquePredicate::getInstructionType(Instruction &inst, StringRef metaKindName) {
   LLVMContext &context = inst.getContext();
   unsigned metaKind = context.getMDKindID(metaKindName);
 
@@ -390,18 +397,6 @@ OpaquePredicate::getInstructionType(TerminatorInst &inst,
   }
 
   // Checks
-  BranchInst *branch = dyn_cast<BranchInst>(&inst);
-  assert(branch && "Terminator should be a branch!");
-  assert(branch->isConditional() && "Stub terminator should be conditional!");
-
-  Value *condition = branch->getCondition();
-  FCmpInst *compare = dyn_cast<FCmpInst>(condition);
-  assert(compare && "Stub condition should be FCmpInst");
-  assert(compare->getNumOperands() == 2 &&
-         "Penultimate instruction should have two operands");
-  assert(compare->getPredicate() == FCmpInst::FCMP_TRUE &&
-         "Penultimate instruction should have an always true predicate");
-
   assert(meta->getNumOperands() == 1 && "Meta node should only have 1 operand");
 
   MDString *mdstring = dyn_cast<MDString>(meta->getOperand(0));
@@ -423,8 +418,7 @@ OpaquePredicate::getInstructionType(TerminatorInst &inst,
 
 bool OpaquePredicate::isBasicBlockUnreachable(BasicBlock &block) {
   Instruction &inst = *(block.begin());
-  TerminatorInst *terminator = dyn_cast<TerminatorInst>(&inst);
-  if (getInstructionType(*terminator, unreachableName) != PredicateNone)
+  if (getInstructionType(inst, unreachableName) != PredicateNone)
     return true;
   else
     return false;

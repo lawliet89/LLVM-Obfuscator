@@ -113,7 +113,7 @@ private:
   }
   static void tagInstruction(Instruction &inst, StringRef metaKindName,
                              PredicateType type = PredicateRandom);
-  static PredicateType getInstructionType(TerminatorInst &inst,
+  static PredicateType getInstructionType(Instruction &inst,
                                           StringRef metaKindName);
 };
 
