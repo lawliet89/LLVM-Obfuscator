@@ -360,7 +360,8 @@ void OpaquePredicate::createFalse(BasicBlock *headBlock, BasicBlock *trueBlock,
 
 void OpaquePredicate::createStub(BasicBlock *block, BasicBlock *trueBlock,
                                  BasicBlock *falseBlock,
-                                 OpaquePredicate::PredicateType type) {
+                                 OpaquePredicate::PredicateType type,
+                                 bool markUnreachable) {
   // Check if basic block has a terminator, if so, remove it
   if (block->getTerminator()) {
     block->getTerminator()->eraseFromParent();
@@ -454,6 +455,7 @@ raw_ostream &operator<<(raw_ostream &stream,
 
 StringRef OpaquePredicate::stubName("opaque_stub");
 StringRef OpaquePredicate::unreachableName("opaque_unreachable");
+StringRef OpaquePredicate::unreachableMarkName("opaque_mark");
 char OpaquePredicate::ID = 0;
 static RegisterPass<OpaquePredicate>
     X("opaque-predicate", "Replace stub branch with opaque predicates", false,

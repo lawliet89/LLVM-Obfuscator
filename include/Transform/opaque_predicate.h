@@ -37,6 +37,7 @@ struct OpaquePredicate : public ModulePass {
   static char ID;
   std::minstd_rand engine;
   static StringRef stubName;
+  static StringRef unreachableMarkName;
   static StringRef unreachableName;
 
   OpaquePredicate() : ModulePass(ID) {}
@@ -44,7 +45,8 @@ struct OpaquePredicate : public ModulePass {
 
   static void createStub(BasicBlock *block, BasicBlock *trueBlock,
                          BasicBlock *falseBlock,
-                         PredicateType type = PredicateRandom);
+                         PredicateType type = PredicateRandom,
+                         bool markUnreachable = true);
 
   static bool isBasicBlockUnreachable(BasicBlock &block);
   static void clearUnreachable(BasicBlock &block);

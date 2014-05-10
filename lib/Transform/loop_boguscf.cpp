@@ -46,17 +46,26 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
   BasicBlock *dummy = header->splitBasicBlock(header->getTerminator());
   loop->addBasicBlockToLoop(dummy, info.getBase());
 
-  if (branch->getSuccessor(1) == exit) {
-    // True dummy predicate
+  BasicBlock *trueBlock, *falseBlock = exit;
 
+  if (branch->getSuccessor(0) == exit) {
+    trueBlock = branch->getSuccessor(1);
+    branch->setSuccessor(1, dummy);
   } else {
-    // False dummy predicate
+    trueBlock = branch->getSuccessor(0);
+    branch->setSuccessor(0, dummy);
   }
+
+  branch->moveBefore(header->getTerminator());
+  header->getTerminator()->eraseFromParent();
+
+  OpaquePredicate::createStub(dummy, trueBlock, falseBlock,
+                              OpaquePredicate::PredicateTrue, false);
 
   return true;
 }
 
-void LoopBogusCF::getAnalysisUsage (AnalysisUsage &AU) const {
+void LoopBogusCF::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<LoopInfo>();
 }
 

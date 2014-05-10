@@ -25,6 +25,9 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
 
+  // Demote PHIs to memory for ease of analysis
+  PM.add(createDemoteRegisterToMemoryPass());
+
   // First batch of passes are trivial passes and should be run first to
   // "maximise confusion" that the later passes will introduce
   PM.add(new Copy());
