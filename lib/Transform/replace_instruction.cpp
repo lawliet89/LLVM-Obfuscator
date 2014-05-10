@@ -160,7 +160,7 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
                    << "\n");
       replacements.push_back(std::make_pair(&inst, (Instruction *)newCompare));
 
-    } else if (isa<LoadInst>(&inst)) {
+    } else if (isa<LoadInst>(&inst)) { // TODO
       DEBUG(errs() << "\t\tLoad Instruction\n");
       Type *type = inst.getType();
       if (!type->isFloatTy() && !type->isIntegerTy()) {
@@ -168,7 +168,7 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
               << "\t\tSkipping -- neither floating point nor integer type\n");
         continue;
       }
-    } else if (isa<StoreInst>(&inst)) {
+    } else if (isa<StoreInst>(&inst)) { // TODO
       DEBUG(errs() << "\t\tStore Instruction\n");
       Type *type = inst.getOperand(0)->getType();
       if (!type->isFloatTy() && !type->isIntegerTy()) {
