@@ -24,7 +24,7 @@ STATISTIC(NumLoopsObf, "Number of loops obfuscated");
 bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
   ++NumLoops;
   DEBUG(errs() << "LoopBogusCF: Dumping loop info\n");
-  DEBUG(loop->dump());
+  // DEBUG(loop->dump());
 
   BasicBlock *header = loop->getHeader();
 
@@ -39,13 +39,20 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
     return false;
   }
 
-  BasicBlock *exit = loop->getUniqueExitBlock();
-  if (!exit) {
+  BasicBlock *exitBlock = loop->getUniqueExitBlock();
+  if (!exitBlock) {
     DEBUG(errs() << "\t No unique exit block -- skipping\n");
     return false;
   }
 
+  if (branch->getSuccessor(0) != exitBlock &&
+      branch->getSuccessor(1) != exitBlock) {
+    DEBUG(errs() << "\t Not trivial loop -- skipping\n");
+    return false;
+  }
+
   ++NumLoopsObf;
+  DEBUG(header->getParent()->viewCFG());
 
   DEBUG(errs() << "\tCreating dummy block\n");
   LoopInfo &info = getAnalysis<LoopInfo>();
@@ -53,9 +60,9 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
   BasicBlock *dummy = header->splitBasicBlock(header->getTerminator());
   loop->addBasicBlockToLoop(dummy, info.getBase());
 
-  BasicBlock *trueBlock, *falseBlock = exit;
+  BasicBlock *trueBlock, *falseBlock = exitBlock;
 
-  if (branch->getSuccessor(0) == exit) {
+  if (branch->getSuccessor(0) == exitBlock) {
     trueBlock = branch->getSuccessor(1);
     branch->setSuccessor(1, dummy);
   } else {
@@ -68,6 +75,8 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
 
   OpaquePredicate::createStub(dummy, trueBlock, falseBlock,
                               OpaquePredicate::PredicateTrue, false);
+
+  DEBUG(header->getParent()->viewCFG());
 
   return true;
 }
