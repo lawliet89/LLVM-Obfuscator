@@ -47,6 +47,10 @@ bool OpaquePredicate::runOnModule(Module &M) {
 
   std::uniform_int_distribution<int> distribution;
   std::uniform_int_distribution<int> distributionType(0, 1);
+
+  LLVMContext &context = M.getContext();
+  unsigned metaKind = context.getMDKindID(unreachableMarkName);
+
   for (auto &function : M) {
     DEBUG(errs() << "\tFunction " << function.getName() << "\n");
     for (auto &block : function) {
@@ -77,6 +81,11 @@ bool OpaquePredicate::runOnModule(Module &M) {
       BasicBlock *trueBlock = branch->getSuccessor(0);
       BasicBlock *falseBlock = branch->getSuccessor(1);
 
+      bool mark = true;
+      if (branch->getMetadata(metaKind)) {
+        mark = false;
+      }
+
       branch->eraseFromParent();
       compare->eraseFromParent();
 
@@ -103,17 +112,19 @@ bool OpaquePredicate::runOnModule(Module &M) {
                      << "\n");
       }
 
-      switch (createdType) {
-      case PredicateTrue:
-        tagInstruction(*(falseBlock->begin()), unreachableName, PredicateTrue);
-        break;
-      case PredicateFalse:
-        tagInstruction(*(trueBlock->begin()), unreachableName, PredicateFalse);
-        break;
-      default:
-        llvm_unreachable("Unsupported predicate type");
+      // Check if we want any marking
+      if (mark) {
+        switch (createdType) {
+        case PredicateTrue:
+          tagInstruction(*(falseBlock->begin()), unreachableName, PredicateTrue);
+          break;
+        case PredicateFalse:
+          tagInstruction(*(trueBlock->begin()), unreachableName, PredicateFalse);
+          break;
+        default:
+          llvm_unreachable("Unsupported predicate type");
+        }
       }
-
       DEBUG_WITH_TYPE("opaque_cfg", function.viewCFG());
     }
   }
@@ -375,6 +386,14 @@ void OpaquePredicate::createStub(BasicBlock *block, BasicBlock *trueBlock,
   BranchInst *branch =
       BranchInst::Create(trueBlock, falseBlock, (Value *)condition, block);
   tagInstruction(*branch, stubName, type);
+
+  if (!markUnreachable) {
+    LLVMContext &context = block->getContext();
+    unsigned metaKind = context.getMDKindID(unreachableMarkName);
+    MDNode *metaNode =
+        MDNode::get(context, MDString::get(context, unreachableMarkName));
+    branch->setMetadata(metaKind, metaNode);
+  }
 }
 
 void OpaquePredicate::tagInstruction(Instruction &inst, StringRef metaKindName,

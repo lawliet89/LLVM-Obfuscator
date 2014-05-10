@@ -9,6 +9,7 @@
 #define DEBUG_TYPE "loop_boguscf"
 #include "Transform/loop_boguscf.h"
 #include "Transform/opaque_predicate.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -17,7 +18,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
 
+STATISTIC(NumLoops, "Number of loops inspected");
+STATISTIC(NumLoopsObf, "Number of loops obfuscated");
+
 bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
+  ++NumLoops;
   DEBUG(errs() << "LoopBogusCF: Dumping loop info\n");
   DEBUG(loop->dump());
 
@@ -39,6 +44,8 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
     DEBUG(errs() << "\t No unique exit block -- skipping\n");
     return false;
   }
+
+  ++NumLoopsObf;
 
   DEBUG(errs() << "\tCreating dummy block\n");
   LoopInfo &info = getAnalysis<LoopInfo>();
