@@ -47,6 +47,7 @@ struct OpaquePredicate : public ModulePass {
                          PredicateType type = PredicateRandom);
 
   static bool isBasicBlockUnreachable(BasicBlock &block);
+  static void clearUnreachable(BasicBlock &block);
 
 private:
   // Prepare module for opaque predicates by adding global variables to the

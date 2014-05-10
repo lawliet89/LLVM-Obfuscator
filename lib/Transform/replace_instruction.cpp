@@ -86,6 +86,10 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
   }
 
   bool hasBeenModified = false;
+
+  OpaquePredicate::clearUnreachable(block);
+  hasBeenModified = true;
+
   std::vector<std::pair<Instruction *, Instruction *> > replacements;
 
   for (Instruction &inst : block) {
@@ -126,7 +130,7 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
       BinaryOperator *newInst =
           BinaryOperator::Create((Instruction::BinaryOps)newOpcode,
                                  inst.getOperand(0), inst.getOperand(1));
-      DEBUG(errs() << "\t\tReplacing with new insturction: " << *newInst
+      DEBUG(errs() << "\t\tReplacing with new instruction: " << *newInst
                    << "\n");
       replacements.push_back(std::make_pair(&inst, (Instruction *)newInst));
 
@@ -152,7 +156,7 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
       CmpInst *newCompare =
           CmpInst::Create(compare->getOpcode(), newPredicate,
                           compare->getOperand(0), compare->getOperand(1));
-      DEBUG(errs() << "\t\tReplacing with new insturction: " << *newCompare
+      DEBUG(errs() << "\t\tReplacing with new instruction: " << *newCompare
                    << "\n");
       replacements.push_back(std::make_pair(&inst, (Instruction *)newCompare));
 
@@ -164,11 +168,15 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
               << "\t\tSkipping -- neither floating point nor integer type\n");
         continue;
       }
+    } else if (isa<StoreInst>(&inst)) {
+      DEBUG(errs() << "\t\tStore Instruction\n");
+      Type *type = inst.getOperand(0)->getType();
+      if (!type->isFloatTy() && !type->isIntegerTy()) {
+        DEBUG(errs()
+              << "\t\tSkipping -- neither floating point nor integer type\n");
+        continue;
+      }
     }
-    // Store
-    // Load
-    // Compare
-    // Select
   }
 
   if (replacements.empty()) {

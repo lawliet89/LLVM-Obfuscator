@@ -423,6 +423,12 @@ bool OpaquePredicate::isBasicBlockUnreachable(BasicBlock &block) {
   else
     return false;
 }
+void OpaquePredicate::clearUnreachable(BasicBlock &block) {
+  Instruction &inst = *(block.begin());
+  LLVMContext &context = inst.getContext();
+  unsigned metaKind = context.getMDKindID(unreachableName);
+  inst.setMetadata(metaKind, nullptr);
+}
 
 raw_ostream &operator<<(raw_ostream &stream,
                         const OpaquePredicate::PredicateType &o) {
