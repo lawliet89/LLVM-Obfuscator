@@ -9,6 +9,7 @@
 #define DEBUG_TYPE "replace-instruction"
 #include "Transform/replace_instruction.h"
 #include "Transform/opaque_predicate.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
@@ -30,6 +31,11 @@ static cl::opt<std::string> replaceSeed(
     "replaceSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
+STATISTIC(NumInstReplaced, "Number of instructions replaced");
+STATISTIC(NumUnreachableBlocks, "Number of unreachable basic blocks");
+STATISTIC(NumUnviableBlocks, "Number of unreachable basic blocks with no "
+                             "viable instruction replacements");
+
 namespace {
 static const unsigned intOpSize = 13;
 static unsigned intOps[intOpSize] = {
@@ -43,6 +49,21 @@ static const unsigned floatOpsSize = 5;
 static unsigned floatOps[floatOpsSize] = { Instruction::FAdd, Instruction::FSub,
                                            Instruction::FMul, Instruction::FDiv,
                                            Instruction::FRem };
+
+static const unsigned intCompareSize = 10;
+static unsigned intCompare[intCompareSize] = {
+  CmpInst::ICMP_EQ, CmpInst::ICMP_NE, CmpInst::ICMP_UGT, CmpInst::ICMP_UGE,
+  CmpInst::ICMP_ULT, CmpInst::ICMP_ULE, CmpInst::ICMP_SGT, CmpInst::ICMP_SGE,
+  CmpInst::ICMP_SLT, CmpInst::ICMP_SLE
+};
+
+static const unsigned floatCompareSize = 14;
+static unsigned floatCompare[floatCompareSize] = {
+  CmpInst::FCMP_OEQ, CmpInst::FCMP_OGT, CmpInst::FCMP_OGE, CmpInst::FCMP_OLT,
+  CmpInst::FCMP_OLE, CmpInst::FCMP_ONE, CmpInst::FCMP_ORD, CmpInst::FCMP_UNO,
+  CmpInst::FCMP_UEQ, CmpInst::FCMP_UGT, CmpInst::FCMP_UGE, CmpInst::FCMP_ULT,
+  CmpInst::FCMP_ULE, CmpInst::FCMP_UNE
+};
 }
 
 bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
@@ -51,9 +72,10 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
     return false;
   }
   DEBUG(errs() << "Unreachable Block: " << block.getName() << "\n");
+  ++NumUnreachableBlocks;
 
   std::minstd_rand engine;
-  std::uniform_int_distribution<unsigned> distribution;
+  std::uniform_int_distribution<int64_t> distribution;
   // Seed engine and create distribution
   if (!replaceSeed.empty()) {
     std::seed_seq seed(replaceSeed.begin(), replaceSeed.end());
@@ -107,16 +129,57 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
       DEBUG(errs() << "\t\tReplacing with new insturction: " << *newInst
                    << "\n");
       replacements.push_back(std::make_pair(&inst, (Instruction *)newInst));
+
+    } else if (CmpInst *compare = dyn_cast<CmpInst>(&inst)) {
+      DEBUG(errs() << "\t\tCompare Instruction\n");
+
+      unsigned predicate = compare->getPredicate();
+      unsigned newPredicate = predicate;
+
+      if (compare->isFPPredicate()) {
+        while (newPredicate == predicate) {
+          unsigned choice = distribution(engine) % floatCompareSize;
+          newPredicate = floatCompare[choice];
+        }
+      } else if (compare->isIntPredicate()) {
+        while (newPredicate == predicate) {
+          unsigned choice = distribution(engine) % intCompareSize;
+          newPredicate = intCompare[choice];
+        }
+      } else {
+        llvm_unreachable("Unknown comparison type");
+      }
+      CmpInst *newCompare =
+          CmpInst::Create(compare->getOpcode(), newPredicate,
+                          compare->getOperand(0), compare->getOperand(1));
+      DEBUG(errs() << "\t\tReplacing with new insturction: " << *newCompare
+                   << "\n");
+      replacements.push_back(std::make_pair(&inst, (Instruction *)newCompare));
+
+    } else if (isa<LoadInst>(&inst)) {
+      DEBUG(errs() << "\t\tLoad Instruction\n");
+      Type *type = inst.getType();
+      if (!type->isFloatTy() && !type->isIntegerTy()) {
+        DEBUG(errs()
+              << "\t\tSkipping -- neither floating point nor integer type\n");
+        continue;
+      }
     }
+    // Store
+    // Load
+    // Compare
+    // Select
   }
 
   if (replacements.empty()) {
     // Do some warning
     errs() << "WARNING: Unable to find suitable replacements for unreachable "
               "block -- will be optimised away\n";
+    ++NumUnviableBlocks;
   } else {
     for (auto &pair : replacements) {
       ReplaceInstWithInst(pair.first, pair.second);
+      ++NumInstReplaced;
       hasBeenModified = true;
     }
   }
