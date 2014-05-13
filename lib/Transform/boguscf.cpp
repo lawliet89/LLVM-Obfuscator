@@ -13,7 +13,6 @@
 // Each basic block is probabilistically split using a Bernoulli distribution
 // subject to a maximum number of basic blocks being transformed per function
 //
-// TODO: Opaque predicate generation
 // Command line options
 // - bcfFunc - List of functions to apply transformation to. Default is all
 // - bfcProbability - Probability that basic block is transformed. Default 0.5
@@ -22,9 +21,7 @@
 // Debug types:
 // - boguscf - Bogus CF related
 // - cfg - View CFG of functions before and after transformation
-// TODO:
-//  - Mangle basic block that is not in the predicate path
-//  - Indeterminate opaque predicate
+// TODO: Indeterminate opaque predicate
 
 #define DEBUG_TYPE "boguscf"
 #include "Transform/boguscf.h"
@@ -445,21 +442,6 @@ bool BogusCF::runOnFunction(Function &F) {
         }
 #endif
     }
-
-#if 0
-      // Create Opaque Predicates
-      std::uniform_int_distribution<int> distribution;
-      std::uniform_int_distribution<int> distributionType(0, 1);
-      OpaquePredicate::PredicateType type =
-          OpaquePredicate::create(block, originalBlock, copyBlock, globals, [&]{
-        return distribution(engine);
-      },
-                                  [&]()->OpaquePredicate::PredicateType{
-        return static_cast<OpaquePredicate::PredicateType>(
-            distributionType(engine));
-      });
-      DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
-#endif
 
     // Clear the unconditional branch from the "husk" original block
     block->getTerminator()->eraseFromParent();

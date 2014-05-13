@@ -26,8 +26,6 @@
 #include <vector>
 #include <chrono>
 
-// TODO: Synergise other passes with copying
-
 static cl::list<std::string> copyFunc("copyFunc", cl::CommaSeparated,
                                       cl::desc("Only copy some functions: "
                                                "copyFunc=\"func1,func2\""));

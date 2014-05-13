@@ -433,7 +433,6 @@ bool Flatten::isEligible(Function &F) {
 
     // LLVM does not support PHINodes for Invoke Edges
     if (isa<InvokeInst>(block.getTerminator())) {
-      // TODO Maybe handle this
       DEBUG(errs() << "\tIneligible function -- InvokeInst encountered\n");
       return false;
     }
