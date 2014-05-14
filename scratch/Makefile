@@ -8,7 +8,9 @@ OBF_FLAGS =
 
 all: test/get_input.o test/get_input_obf.o test/stack-sort\
 	test/stack-sort-obf test/hanoi test/hanoi-obf\
-	test/mergesort test/mergesort-obf
+	test/mergesort test/mergesort-obf\
+	test/radixsort test/radixsort-obf\
+	test/quicksort test/quicksort-obf
 
 test/get_input.o: get_input.cpp get_input.h
 	$(CPP) $(CPP_FLAGS) -c -o test/get_input.o get_input.cpp
@@ -36,6 +38,20 @@ test/mergesort: mergesort.cpp test/get_input.o
 test/mergesort-obf: mergesort.cpp test/get_input_obf.o
 	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
 		-o test/mergesort-obf mergesort.cpp test/get_input_obf.o
+
+test/radixsort: radixsort.cpp test/get_input.o
+	$(CPP) $(CPP_FLAGS) -o test/radixsort radixsort.cpp test/get_input.o
+
+test/radixsort-obf: radixsort.cpp test/get_input_obf.o
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
+		-o test/radixsort-obf radixsort.cpp test/get_input_obf.o
+
+test/quicksort: quicksort.cpp test/get_input.o
+	$(CPP) $(CPP_FLAGS) -o test/quicksort quicksort.cpp test/get_input.o
+
+test/quicksort-obf: quicksort.cpp test/get_input_obf.o
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
+		-o test/quicksort-obf quicksort.cpp test/get_input_obf.o
 
 clean:
 	rm -f test/*
