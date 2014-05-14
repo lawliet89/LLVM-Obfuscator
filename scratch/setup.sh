@@ -16,5 +16,5 @@ mkdir -p $BUILD_DIR
     && cd LLVM-Obfuscator && ../../../../configure "$CONFIGURE_FLAGS")
 (cd $BUILD_DIR && make -j 4)
 (cd "$BUILD_DIR/projects/LLVM-Obfuscator" && make -j 4)
-
+mkdir -p test
 echo "Built and setup"
