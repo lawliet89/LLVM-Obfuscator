@@ -3,17 +3,15 @@ set -eu
 
 DEBUG=false
 BUILD_DIR="build"
-CONFIGURE_FLAGS="--enable-cxx11"
+CONFIGURE_FLAGS=""
 CXX=g++
 
 LLVM_PATH=${LLVM_PATH:-"../../../../"}
 
 if [[ "$DEBUG" == "false" ]]; then
     echo "Building release";
-    CONFIGURE_FLAGS="${CONFIGURE_FLAGS} --enable-optimized";
+    CONFIGURE_FLAGS="${CONFIGURE_FLAGS}--enable-optimized";
 fi
-
-echo $CONFIGURE_FLAGS
 
 mkdir -p $BUILD_DIR
 echo "================= Configuring LLVM ==============="
