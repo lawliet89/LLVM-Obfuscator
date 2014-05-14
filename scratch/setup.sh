@@ -4,7 +4,8 @@ set -eu
 DEBUG=false
 BUILD_DIR="build"
 CONFIGURE_FLAGS=""
-CXX=g++
+CC=clang
+CXX=clang++
 
 LLVM_PATH=${LLVM_PATH:-"../../../../"}
 
