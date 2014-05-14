@@ -1,10 +1,43 @@
-BUILD_SCRIPT = ./obf.sh
+OBF_BUILD = ./obf.sh
 BUILD_DIR = build
-OBF_BUILD = build/projects/LLVM-Obfuscator/Release+Asserts
 
 CPP = $(BUILD_DIR)/Release+Asserts/bin/clang++
 CPP_FLAGS = -O3 -Wall -std=c++11
-CPP_OBF = -Xclang -load -Xclang ${OBF_BUILD}/lib/LLVMObfuscatorTransforms.so
+
+OBF_FLAGS =
+
+all: test/get_input.o test/get_input_obf.o test/stack-sort\
+	test/stack-sort-obf test/hanoi test/hanoi-obf\
+	test/mergesort test/mergesort-obf
 
 test/get_input.o: get_input.cpp get_input.h
 	$(CPP) $(CPP_FLAGS) -c -o test/get_input.o get_input.cpp
+
+test/get_input_obf.o: get_input.cpp get_input.h
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS)\
+		-c -o test/get_input_obf.o get_input.cpp
+
+test/stack-sort: stack-sort.cpp test/get_input.o
+	$(CPP) $(CPP_FLAGS) -o test/stack-sort stack-sort.cpp test/get_input.o
+
+test/stack-sort-obf: stack-sort.cpp test/get_input_obf.o
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
+		-o test/stack-sort-obf stack-sort.cpp test/get_input_obf.o
+
+test/hanoi: hanoi.cpp
+	$(CPP) $(CPP_FLAGS) -o test/hanoi hanoi.cpp
+
+test/hanoi-obf: hanoi.cpp
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) -o test/hanoi-obf hanoi.cpp
+
+test/mergesort: mergesort.cpp test/get_input.o
+	$(CPP) $(CPP_FLAGS) -o test/mergesort mergesort.cpp test/get_input.o
+
+test/mergesort-obf: mergesort.cpp test/get_input_obf.o
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
+		-o test/mergesort-obf mergesort.cpp test/get_input_obf.o
+
+clean:
+	rm -f test/*
+
+.PHONY: all clean
