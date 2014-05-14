@@ -4,8 +4,6 @@ set -eu
 DEBUG=false
 BUILD_DIR="build"
 CONFIGURE_FLAGS="--enable-cxx11"
-export CC=gcc
-export CXX=g++
 
 LLVM_PATH=${LLVM_PATH:-"../../../../"}
 
