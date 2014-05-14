@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    std::cout << "Usage: number [percentage sorted]\n";
+    std::cerr << "Usage: number [percentage sorted]\n";
     return 0;
   }
 
@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   if (argc > 2) {
     double check = atof(argv[2]);
     if (check > 1.f || check < 0.f) {
-      std::cout << "Express percentage as an integer in the range [0, 1]\n";
+      std::cerr << "Express percentage as an integer in the range [0, 1]\n";
       return 0;
     }
     percent = check;
