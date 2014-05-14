@@ -2,11 +2,11 @@
 set -eu
 
 OUTPUT=results.txt
-SIZES=(10 50 100 200 500 1000 2500 5000 10000)
+SIZES=(10 50 100 200 500 1000 2500 5000 10000 100000 1000000 10000000 100000000)
 SORTS=(mergesort quicksort stack-sort)
 
 main() {
-    if [[ $1 ]]; then
+    if [[ -n "${1+1}" ]]; then
         OUTPUT=$1
     fi
 
@@ -16,9 +16,13 @@ main() {
     echo "Writing results to $OUTPUT"
     echo -n "" > $OUTPUT
 
-    tempdir=$(mktemp -d "/tmp/obfuscator.XXXXXXXXXX") ||\
-    { echo "Failed to create temp directory"; exit 1; }
-    trap "rm -rf $tempdir" EXIT
+    # tempdir=$(mktemp -d "/tmp/obfuscator.XXXXXXXXXX") ||\
+    # { echo "Failed to create temp directory"; exit 1; }
+    # trap "rm -rf $tempdir" EXIT
+
+    tempdir=temp
+    rm -rf $tempdir
+    mkdir -p $tempdir
 
     echo "Generating sequences..."
     for size in ${SIZES[@]}; do

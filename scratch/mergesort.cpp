@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
   mergesort(input.begin(), input.end(), output.begin());
 
   for (auto number : output) {
-    std::cout << number << " ";
+    std::cout << number << "\n";
   }
   return 0;
 }

@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
   // C++11 ranged based for loops
   // http://www.cprogramming.com/c++11/c++11-ranged-for-loop.html
   for (int it : input) {
-    std::cout << it << " ";
+    std::cout << it << "\n";
   }
 
   return 0;

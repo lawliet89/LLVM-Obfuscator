@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   stack<int> sorted = stackSort(inputStack);
 
   while (!sorted.empty()) {
-    cout << sorted.top() << " ";
+    cout << sorted.top() << "\n";
     sorted.pop();
   }
   cout << endl;
