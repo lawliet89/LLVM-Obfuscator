@@ -3,7 +3,8 @@ set -eu
 
 DEBUG=false
 BUILD_DIR="build"
-CONFIGURE_FLAGS=""
+CONFIGURE_FLAGS="--enable-cxx11 "
+CXX=g++
 
 LLVM_PATH=${LLVM_PATH:-"../../../../"}
 
