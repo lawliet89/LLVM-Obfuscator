@@ -6,7 +6,7 @@ CPP_FLAGS = -O3 -Wall -std=c++11
 
 OBF_FLAGS =
 
-all: test/get_input.o test/get_input_obf.o test/stack-sort\
+all: test/get_input.o test/get_input_obf.o test/generator test/stack-sort\
 	test/stack-sort-obf test/hanoi test/hanoi-obf\
 	test/mergesort test/mergesort-obf\
 	test/radixsort test/radixsort-obf\
@@ -52,6 +52,9 @@ test/quicksort: quicksort.cpp test/get_input.o
 test/quicksort-obf: quicksort.cpp test/get_input_obf.o
 	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
 		-o test/quicksort-obf quicksort.cpp test/get_input_obf.o
+
+test/generator: generator.cpp
+	$(CPP) $(CPP_FLAGS) -o test/generator generator.cpp
 
 clean:
 	rm -f test/*
