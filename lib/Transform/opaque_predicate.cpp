@@ -1,4 +1,4 @@
-//=== opaque_predicate.h - Manufactures opaque predicates -----------------===//
+//=== opaque_predicate.cpp - Manufactures opaque predicates ---------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -116,10 +116,12 @@ bool OpaquePredicate::runOnModule(Module &M) {
       if (mark) {
         switch (createdType) {
         case PredicateTrue:
-          tagInstruction(*(falseBlock->begin()), unreachableName, PredicateTrue);
+          tagInstruction(*(falseBlock->begin()), unreachableName,
+                         PredicateTrue);
           break;
         case PredicateFalse:
-          tagInstruction(*(trueBlock->begin()), unreachableName, PredicateFalse);
+          tagInstruction(*(trueBlock->begin()), unreachableName,
+                         PredicateFalse);
           break;
         default:
           llvm_unreachable("Unsupported predicate type");
@@ -142,11 +144,31 @@ Value *OpaquePredicate::advanceGlobal(BasicBlock *block, GlobalVariable *global,
   DEBUG(errs() << "\tLoading global\n");
   LoadInst *load = new LoadInst((Value *)global, "", block);
   DEBUG(errs() << "\tAdding global\n");
-  BinaryOperator *add = BinaryOperator::Create(Instruction::Add, (Value *)load,
-                                               (Value *)random, "", block);
+
+  Instruction::BinaryOps op = Instruction::Add;
+  switch (randomner() % 3) {
+  case 0:
+    op = Instruction::Add;
+    break;
+  case 1:
+    op = Instruction::Sub;
+    break;
+  case 2:
+    op = Instruction::Mul;
+    break;
+  }
+
+  BinaryOperator *advance =
+      BinaryOperator::Create(op, (Value *)load, (Value *)random, "", block);
   DEBUG(errs() << "\tStoring global\n");
-  new StoreInst(add, (Value *)global, block);
-  return (Value *)add;
+  Value *zero =
+      ConstantInt::get(Type::getInt32Ty(block->getContext()), 0, true);
+  ICmpInst *compare = new ICmpInst(*block, CmpInst::ICMP_EQ, advance, zero);
+  // SelectInst to ensure non zero
+  SelectInst *returnValue =
+      SelectInst::Create(compare, random, advance, "", block);
+  new StoreInst(returnValue, (Value *)global, block);
+  return (Value *)returnValue;
 }
 
 // 7y^2 -1 != x^2 for all x, y in Z
