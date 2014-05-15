@@ -31,7 +31,7 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   // First batch of passes are trivial passes and should be run first to
   // "maximise confusion" that the later passes will introduce
   PM.add(new Copy());
-  // PM.add(new InlineFunctionPass());
+  PM.add(new InlineFunctionPass());
 
   // Second batch of passes deal with introducing new control flow paths
   // These passes will insert stub 1.00 == 1.00 branches
@@ -50,7 +50,7 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   PM.add(new Flatten());
 
   // Clean ups
-  // PM.add(new CleanupPass()); // Remove stray metadata left over from passes
+  PM.add(new CleanupPass()); // Remove stray metadata left over from passes
   PM.add(createPromoteMemoryToRegisterPass()); // Fix PHI demotions
   PM.add(createCFGSimplificationPass()); // Further cleanups
 
