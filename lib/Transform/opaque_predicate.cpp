@@ -116,10 +116,12 @@ bool OpaquePredicate::runOnModule(Module &M) {
       if (mark) {
         switch (createdType) {
         case PredicateTrue:
+          cleanDebug(*falseBlock);
           tagInstruction(*(falseBlock->begin()), unreachableName,
                          PredicateTrue);
           break;
         case PredicateFalse:
+          cleanDebug(*trueBlock);
           tagInstruction(*(trueBlock->begin()), unreachableName,
                          PredicateFalse);
           break;
@@ -498,6 +500,38 @@ raw_ostream &operator<<(raw_ostream &stream,
   }
 
   return stream;
+}
+
+// c.f. http://llvm.org/docs/doxygen/html/DebugInfo_8cpp_source.html
+void OpaquePredicate::cleanDebug(BasicBlock &block) {
+  Module *module = block.getParent()->getParent();
+  Function *declare = module->getFunction("llvm.dbg.declare");
+  Function *value = module->getFunction("llvm.dbg.value");
+
+  std::vector<Instruction *> removeInstructions;
+
+  for (auto &inst : block) {
+    if (CallInst *call = dyn_cast<CallInst>(&inst)) {
+      Function *called = call->getCalledFunction();
+      if (called == declare || called == value) {
+        removeInstructions.push_back(&inst);
+        continue;
+      }
+    }
+
+    if (inst.getDebugLoc().isUnknown()) {
+      inst.setDebugLoc(DebugLoc());
+    }
+    SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
+    inst.getAllMetadataOtherThanDebugLoc(MDs);
+    for (const auto &MD : MDs) {
+      inst.setMetadata(MD.first, nullptr);
+    }
+  }
+
+  for (Instruction *inst : removeInstructions) {
+    inst->eraseFromParent();
+  }
 }
 
 StringRef OpaquePredicate::stubName("opaque_stub");

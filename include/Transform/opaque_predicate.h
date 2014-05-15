@@ -118,6 +118,8 @@ private:
                              PredicateType type = PredicateRandom);
   static PredicateType getInstructionType(Instruction &inst,
                                           StringRef metaKindName);
+
+  static void cleanDebug(BasicBlock &block);
 };
 
 // Overloads for PredicateType
