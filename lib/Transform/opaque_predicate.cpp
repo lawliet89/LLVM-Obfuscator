@@ -515,7 +515,6 @@ void OpaquePredicate::cleanDebug(BasicBlock &block) {
       Function *called = call->getCalledFunction();
       if (called == declare || called == value) {
         removeInstructions.push_back(&inst);
-        continue;
       }
     }
 
