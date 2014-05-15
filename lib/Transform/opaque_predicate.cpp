@@ -139,8 +139,14 @@ Value *OpaquePredicate::advanceGlobal(BasicBlock *block, GlobalVariable *global,
   assert(global && "Null global pointer");
   DEBUG(errs() << "[Opaque Predicate] Randomly advancing global\n");
   DEBUG(errs() << "\tCreating Random Constant\n");
+  int randomValue = randomner();
+
+  while (!randomValue) {
+    randomValue = randomner();
+  }
+
   Value *random = ConstantInt::get(Type::getInt32Ty(block->getContext()),
-                                   randomner(), true);
+                                   randomValue, true);
   DEBUG(errs() << "\tLoading global\n");
   LoadInst *load = new LoadInst((Value *)global, "", block);
   DEBUG(errs() << "\tAdding global\n");
