@@ -2,7 +2,7 @@
 set -eu
 
 OUTPUT=results.txt
-SIZES=(10 50 100 200 500 1000 2500 5000 10000 100000 1000000)
+SIZES=(10 50 100 200 500 1000 2500 5000 10000)
 SORTS=(mergesort quicksort stack-sort)
 
 main() {
