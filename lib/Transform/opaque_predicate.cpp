@@ -216,11 +216,17 @@ Value *OpaquePredicate::formula0(BasicBlock *block, Value *x1, Value *y1,
 }
 
 // (x^3 - x) % 3 == 0 for all x in Z
-Value *OpaquePredicate::formula1(BasicBlock *block, Value *x1, Value *y1,
+Value *OpaquePredicate::formula1(BasicBlock *block, Value *x, Value *y1,
                                  OpaquePredicate::PredicateType type) {
   // y1 is unused
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 1 does not support indeterminate!");
+
+  // 96 bit integer type
+  Type *intType = (Type *)Type::getIntNTy(block->getContext(), 96);
+
+  // Sign extend to 96 bits
+  Value *x1 = (Value *)new SExtInst(x, intType, "", block);
 
   // x^2
   Value *x2 =
@@ -234,15 +240,13 @@ Value *OpaquePredicate::formula1(BasicBlock *block, Value *x1, Value *y1,
   Value *x4 =
       (Value *)BinaryOperator::Create(Instruction::Sub, x3, x1, "", block);
 
-  Value *three =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 3, false);
+  Value *three = ConstantInt::get(intType, 3, false);
 
   // Finally the mod
   Value *mod =
       (Value *)BinaryOperator::Create(Instruction::SRem, x4, three, "", block);
 
-  Value *zero =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 0, true);
+  Value *zero = ConstantInt::get(intType, 0, false);
 
   Value *condition;
   // Compare
@@ -306,8 +310,8 @@ Value *OpaquePredicate::formula2(BasicBlock *block, Value *x1, Value *y1,
 
 OpaquePredicate::Formula
 OpaquePredicate::getFormula(OpaquePredicate::Randomner randomner) {
-  static const int number = 2;
-  static Formula formales[number] = { formula0/*, formula1*/, formula2 };
+  static const int number = 3;
+  static Formula formales[number] = { formula0, formula1, formula2 };
   int n = randomner() % number;
   DEBUG(errs() << "[Opaque Predicate] Formula " << n << "\n");
   return formales[n];
