@@ -468,10 +468,33 @@ OpaquePredicate::getInstructionType(Instruction &inst, StringRef metaKindName) {
 
 bool OpaquePredicate::isBasicBlockUnreachable(BasicBlock &block) {
   Instruction &inst = *(block.begin());
-  if (getInstructionType(inst, unreachableName) != PredicateNone)
-    return true;
-  else
+  PredicateType type = getInstructionType(inst, unreachableName);
+  if (type == PredicateNone)
     return false;
+  else {
+    // Let's do some checks
+    BasicBlock *predecessor = block.getSinglePredecessor();
+    assert(predecessor && "Unreachable block should only have 1 predecessor");
+
+    BranchInst *branch = dyn_cast<BranchInst>(predecessor->getTerminator());
+    assert(branch && "Predecessor block should have a BranchInst terminator");
+    assert(branch->isConditional() &&
+           "Branch in predecessor should be conditional");
+    // Checks conditions
+    if (type == PredicateTrue) {
+      // Then this block should be the "false" branch
+      assert(branch->getSuccessor(1) == &block &&
+             "Unreachable block is the wrong successor of its predecessor");
+    } else if (type == PredicateFalse) {
+      // Then this block should be the "true" branch
+      assert(branch->getSuccessor(0) == &block &&
+             "Unreachable block is the wrong successor of its predecessor");
+    } else {
+      llvm_unreachable("Unsupported predicate type");
+    }
+
+    return true;
+  }
 }
 void OpaquePredicate::clearUnreachable(BasicBlock &block) {
   Instruction &inst = *(block.begin());
