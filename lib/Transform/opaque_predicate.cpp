@@ -180,16 +180,23 @@ Value *OpaquePredicate::advanceGlobal(BasicBlock *block, GlobalVariable *global,
 }
 
 // 7y^2 -1 != x^2 for all x, y in Z
-Value *OpaquePredicate::formula0(BasicBlock *block, Value *x1, Value *y1,
+Value *OpaquePredicate::formula0(BasicBlock *block, Value *x, Value *y,
                                  OpaquePredicate::PredicateType type) {
 
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 0 does not support indeterminate!");
 
+  // 96 bit integer type
+  Type *intType = (Type *)Type::getIntNTy(block->getContext(), 96);
+
+  // Sign extend to 96 bits
+  Value *x1 = (Value *)new SExtInst(x, intType, "", block);
+  Value *y1 = (Value *)new SExtInst(y, intType, "", block);
+
   Value *seven =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 7, false);
+      ConstantInt::get(intType, 7, false);
   Value *one =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 1, false);
+      ConstantInt::get(intType, 1, false);
   // x^2
   Value *x2 =
       (Value *)BinaryOperator::Create(Instruction::Mul, x1, x1, "", block);
@@ -312,7 +319,6 @@ Value *OpaquePredicate::formula2(BasicBlock *block, Value *x, Value *y1,
 
 OpaquePredicate::Formula
 OpaquePredicate::getFormula(OpaquePredicate::Randomner randomner) {
-  return formula2;
   static const int number = 3;
   static Formula formales[number] = { formula0, formula1, formula2 };
   int n = randomner() % number;
