@@ -39,8 +39,8 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
   // OpaquePredicate pass MUST be run before Flatten Pass because Flatten
   // will REMOVE the original branch instructions
   PM.add(new BogusCF());
-  // PM.add(createLoopSimplifyPass());
-  // PM.add(new LoopBogusCF());
+  PM.add(createLoopSimplifyPass());
+  PM.add(new LoopBogusCF());
   PM.add(new OpaquePredicate());
 
   // The next pass will obfuscated unreachable blocks by introducing junk
