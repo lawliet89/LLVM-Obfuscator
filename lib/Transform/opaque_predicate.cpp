@@ -261,20 +261,22 @@ Value *OpaquePredicate::formula1(BasicBlock *block, Value *x, Value *y1,
 }
 
 // x % 2 == 0 || (x^2 - 1) % 8 == 0 for all x in Z
-Value *OpaquePredicate::formula2(BasicBlock *block, Value *x1, Value *y1,
+Value *OpaquePredicate::formula2(BasicBlock *block, Value *x, Value *y1,
                                  OpaquePredicate::PredicateType type) {
   // y1 is unused
   assert(type != OpaquePredicate::PredicateIndeterminate &&
          "Formula 2 does not support indeterminate!");
 
-  Value *zero =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 0, true);
-  Value *one =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 1, false);
-  Value *two =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 2, false);
-  Value *eight =
-      ConstantInt::get(Type::getInt32Ty(block->getContext()), 8, false);
+  // 64 bit integer type
+  Type *intType = (Type *)Type::getIntNTy(block->getContext(), 64);
+
+  Value *zero = ConstantInt::get(intType, 0, false);
+  Value *one = ConstantInt::get(intType, 1, false);
+  Value *two = ConstantInt::get(intType, 2, false);
+  Value *eight = ConstantInt::get(intType, 8, false);
+
+  // Sign extend to 64 bits
+  Value *x1 = (Value *)new SExtInst(x, intType, "", block);
 
   // x^2
   Value *x2 =
@@ -310,6 +312,7 @@ Value *OpaquePredicate::formula2(BasicBlock *block, Value *x1, Value *y1,
 
 OpaquePredicate::Formula
 OpaquePredicate::getFormula(OpaquePredicate::Randomner randomner) {
+  return formula2;
   static const int number = 3;
   static Formula formales[number] = { formula0, formula1, formula2 };
   int n = randomner() % number;
