@@ -306,8 +306,8 @@ Value *OpaquePredicate::formula2(BasicBlock *block, Value *x1, Value *y1,
 
 OpaquePredicate::Formula
 OpaquePredicate::getFormula(OpaquePredicate::Randomner randomner) {
-  static const int number = 3;
-  static Formula formales[number] = { formula0, formula1, formula2 };
+  static const int number = 2;
+  static Formula formales[number] = { formula0/*, formula1*/, formula2 };
   int n = randomner() % number;
   DEBUG(errs() << "[Opaque Predicate] Formula " << n << "\n");
   return formales[n];
