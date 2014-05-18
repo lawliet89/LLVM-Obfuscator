@@ -333,8 +333,8 @@ std::vector<GlobalVariable *> OpaquePredicate::prepareModule(Module &M) {
                << " globals\n");
   std::vector<GlobalVariable *> globals(opaqueGlobal);
   for (unsigned i = 0; i < opaqueGlobal; ++i) {
-    Twine globalName("global_");
-    globalName = globalName.concat(Twine(i));
+    Twine globalName("");
+    DEBUG(globalName = globalName.concat(Twine("global_")).concat(Twine(i)));
     Value *zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0, true);
     GlobalVariable *global = new GlobalVariable(
         M, Type::getInt32Ty(M.getContext()), false, GlobalValue::CommonLinkage,
