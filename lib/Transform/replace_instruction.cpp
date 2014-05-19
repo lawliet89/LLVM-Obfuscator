@@ -74,7 +74,7 @@ bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
   DEBUG(errs() << "Unreachable Block: " << block.getName() << "\n");
   ++NumUnreachableBlocks;
 
-  std::minstd_rand engine;
+  std::mt19937_64 engine;
   std::uniform_int_distribution<int64_t> distribution;
   // Seed engine and create distribution
   if (!replaceSeed.empty()) {

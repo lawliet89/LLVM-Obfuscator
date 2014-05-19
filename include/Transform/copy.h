@@ -16,7 +16,7 @@ using namespace llvm;
 
 struct Copy : public ModulePass {
   static char ID;
-  std::minstd_rand engine;
+  std::mt19937_64 engine;
   std::bernoulli_distribution trial;
 
   Copy() : ModulePass(ID) {}

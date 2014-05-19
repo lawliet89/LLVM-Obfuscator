@@ -35,7 +35,7 @@ struct OpaquePredicate : public ModulePass {
   typedef std::function<PredicateType()> PredicateTypeRandomner;
 
   static char ID;
-  std::minstd_rand engine;
+  std::mt19937_64 engine;
   static StringRef stubName;
   static StringRef unreachableMarkName;
   static StringRef unreachableName;

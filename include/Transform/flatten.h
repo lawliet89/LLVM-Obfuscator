@@ -19,7 +19,7 @@ using namespace llvm;
 
 struct Flatten : public ModulePass {
   static char ID;
-  std::minstd_rand engine;
+  std::mt19937_64 engine;
   std::bernoulli_distribution trial;
   StringRef metaKindName;
 

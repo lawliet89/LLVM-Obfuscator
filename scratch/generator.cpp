@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     percent = check;
   }
 
-  std::minstd_rand engine;
+  std::mt19937_64 engine;
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   engine.seed(seed);
 
