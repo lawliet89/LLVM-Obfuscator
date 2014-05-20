@@ -18,6 +18,7 @@ struct Copy : public ModulePass {
   static char ID;
   std::mt19937_64 engine;
   std::bernoulli_distribution trial;
+  std::bernoulli_distribution trialReplace;
 
   Copy() : ModulePass(ID) {}
   virtual bool runOnModule(Module &M);
