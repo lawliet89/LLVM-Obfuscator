@@ -15,16 +15,16 @@
 
 using namespace llvm;
 
-struct BogusCF : public ModulePass {
+struct BogusCF : public FunctionPass {
   static char ID;
   std::mt19937_64 engine;
   std::bernoulli_distribution trial;
 
-  BogusCF() : ModulePass(ID) {}
+  BogusCF() : FunctionPass(ID) {}
 
   // Initialise and check options
-  virtual bool runOnModule(Module &M);
-  bool runOnFunction(Function &F);
+  virtual bool doInitialization(Module &M);
+  virtual bool runOnFunction(Function &F);
 
   // Check to see if a function is eligible for bogus CF processing
   static bool isEligible(Function &F);

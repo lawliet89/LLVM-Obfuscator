@@ -67,7 +67,7 @@ STATISTIC(NumBlocksSkipped,
 STATISTIC(NumBlocksTransformed, "Number of basic blocks transformed");
 
 // Initialise and check options
-bool BogusCF::runOnModule(Module &M) {
+bool BogusCF::doInitialization(Module &M) {
   if (bcfProbability < 0.f || bcfProbability > 1.f) {
     LLVMContext &ctx = getGlobalContext();
     ctx.emitError("BogusCF: Probability must be between 0 and 1");
@@ -83,64 +83,7 @@ bool BogusCF::runOnModule(Module &M) {
   }
   trial.param(std::bernoulli_distribution::param_type((double)bcfProbability));
 
-  bool hasBeenModified = false;
-  for (Function &F : M) {
-    hasBeenModified |= runOnFunction(F);
-  }
-  if (!hasBeenModified)
-    return false;
-
-#if 0
-  DEBUG(errs() << "Finalising: Creating Opaque Predicates\n");
-
-  std::uniform_int_distribution<int> distribution;
-  std::uniform_int_distribution<int> distributionType(0, 1);
-
-  LLVMContext &context = M.getContext();
-  unsigned metaKind = context.getMDKindID(metaKindName);
-
-  std::vector<GlobalVariable *> globals =
-      OpaquePredicate::prepareModule(M);
-  for (auto &function : M) {
-    DEBUG(errs() << "\tFunction " << function.getName() << "\n");
-    bool functionHasBlock = false;
-    for (auto &block : function) {
-      TerminatorInst *terminator = block.getTerminator();
-      if (terminator->getMetadata(metaKind)) {
-        functionHasBlock = true;
-        DEBUG(errs() << "\t\tBlock " << block.getName() << "\n");
-
-        // Checks
-        assert(terminator->getNumSuccessors() == 2 &&
-               "Stub terminator block should only have 2 successors");
-        Instruction &condition = *(++block.rbegin());
-        assert(isa<FCmpInst>(condition) &&
-               "Penultimate instruction should be FCmpInst");
-        FCmpInst *fcmp = dyn_cast<FCmpInst>(&condition);
-        assert(fcmp->getNumOperands() == 2 &&
-               "Penultimate instruction should have two operands");
-        assert(fcmp->getPredicate() == FCmpInst::FCMP_TRUE &&
-               "Penultimate instruction should have an always true predicate");
-
-        BasicBlock *trueBlock = terminator->getSuccessor(0);
-        BasicBlock *falseBlock = terminator->getSuccessor(1);
-        terminator->eraseFromParent();
-        fcmp->eraseFromParent();
-
-        OpaquePredicate::PredicateType type =
-            OpaquePredicate::create(&block, trueBlock, falseBlock, globals,
-                                    [&] { return distribution(engine); },
-                                    [&]()->OpaquePredicate::PredicateType {
-              return static_cast<OpaquePredicate::PredicateType>(
-                  distributionType(engine));
-            });
-        DEBUG(errs() << "\t\tOpaque Predicate Created: " << type << "\n");
-      }
-    }
-  }
-#endif
-  DEBUG(errs() << "BogusCF: Done.\n");
-  return true;
+  return false;
 }
 
 bool BogusCF::runOnFunction(Function &F) {
