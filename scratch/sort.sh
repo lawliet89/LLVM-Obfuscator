@@ -13,7 +13,7 @@ set -eu
 # 10 - Flatten 1.0
 
 OUTPUT=results.txt
-SIZES=(10 50)
+SIZES=(10 50 100 200 500 1000 2500 5000 10000 100000 250000 500000)
 SORTS=(mergesort quicksort stack-sort)
 
 BCF_FLAG="-mllvm -bogusCFPass -mllvm -opaquePredicatePass\
@@ -23,7 +23,7 @@ LOOP_FLAG="-mllvm -loopBCFPass -mllvm -opaquePredicatePass\
 FLATTEN_FLAGS="-mllvm -flattenPass -mllvm -opaquePredicatePass\
     -mllvm -replaceInstructionPass"
 
-FLAGS=("" \
+FLAGS=(\
     "-mllvm -trivialObfuscation"\
     "-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0"\
     "$BCF_FLAG"\
