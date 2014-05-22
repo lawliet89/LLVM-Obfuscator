@@ -54,7 +54,14 @@ static cl::opt<bool> copyEnsureReplacement(
     "copyEnsureReplacement", cl::init(true),
     cl::desc("Check and ensure that at least one use is replaced with clone"));
 
+static cl::opt<bool> disableCopy(
+    "disableCopy", cl::init(false),
+    cl::desc("Disable Copy pass regardless. Useful when used in -OX mode."));
+
 bool Copy::runOnModule(Module &M) {
+  if (disableCopy)
+    return false;
+
   // Initialise
   if (copyProbability < 0.f || copyProbability > 1.f) {
     LLVMContext &ctx = getGlobalContext();

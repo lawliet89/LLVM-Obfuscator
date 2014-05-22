@@ -32,7 +32,14 @@ static cl::opt<std::string> opaqueSeed(
     "opaque-seed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
+static cl::opt<bool> disableOpaquePred(
+    "disableOpaquePred", cl::init(false),
+    cl::desc("Disable Opaque Predicate pass regardless. Useful when used in -OX mode."));
+
 bool OpaquePredicate::runOnModule(Module &M) {
+  if (disableOpaquePred)
+    return false;
+
   // Seed engine and create distribution
   if (!opaqueSeed.empty()) {
     std::seed_seq seed(opaqueSeed.begin(), opaqueSeed.end());

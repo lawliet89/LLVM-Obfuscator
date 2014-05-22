@@ -18,7 +18,14 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CFG.h"
 
+static cl::opt<bool> disableRenamer(
+    "disableRenamer", cl::init(false),
+    cl::desc("Disable Rename pass regardless. Useful when used in -OX mode."));
+
 bool IdentifierRenamer::runOnModule(Module &M) {
+  if (disableRenamer)
+    return false;
+
   // Rename globals if possible
   for (auto G = M.global_begin(), GEnd = M.global_end(); G != GEnd; ++G) {
     GlobalValue::LinkageTypes linkage = G->getLinkage();

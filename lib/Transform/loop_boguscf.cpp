@@ -21,7 +21,15 @@
 STATISTIC(NumLoops, "Number of loops inspected");
 STATISTIC(NumLoopsObf, "Number of loops obfuscated");
 
+static cl::opt<bool> disableLoopBcf(
+    "disableLoopBcf", cl::init(false),
+    cl::desc(
+        "Disable Loop BCF pass regardless. Useful when used in -OX mode."));
+
 bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
+  if (disableLoopBcf)
+    return false;
+
   ++NumLoops;
   DEBUG(errs() << "LoopBogusCF: Dumping loop info\n");
   // DEBUG(loop->dump());

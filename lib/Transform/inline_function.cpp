@@ -25,17 +25,22 @@
 #include <vector>
 #include <chrono>
 
-static cl::opt<double>
-inlineProbability("inlineProbability", cl::init(0.2),
-                  cl::desc("Probability that a function call will be inlined"));
+static cl::opt<double> inlineProbability(
+    "inlineProbability", cl::init(0.2),
+    cl::desc("Probability that a function call will be inlined"));
 
 static cl::opt<std::string> inlineSeed(
     "inlineSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
-static cl::opt<unsigned>
-inlinePass("inlinePass", cl::init(2),
-           cl::desc("Number of passes to attempt to inline function calls"));
+static cl::opt<unsigned> inlinePass(
+    "inlinePass", cl::init(2),
+    cl::desc("Number of passes to attempt to inline function calls"));
+
+static cl::opt<bool>
+    disableInline("disableInline", cl::init(false),
+                  cl::desc("Disable Inline function pass regardless. Useful "
+                           "when used in -OX mode."));
 
 bool InlineFunctionPass::doInitialization(Module &M) {
   if (inlineProbability < 0.f || inlineProbability > 1.f) {
@@ -59,6 +64,8 @@ bool InlineFunctionPass::doInitialization(Module &M) {
 }
 
 bool InlineFunctionPass::runOnFunction(Function &F) {
+  if (disableInline)
+    return false;
   // If the function is declared elsewhere in other translation unit
   // we should not modify it here
   if (F.isDeclaration()) {
@@ -114,5 +121,6 @@ bool InlineFunctionPass::runOnFunction(Function &F) {
 }
 
 char InlineFunctionPass::ID = 0;
-static RegisterPass<InlineFunctionPass>
-X("inline-function", "Inline function obfuscation pass", false, false);
+static RegisterPass<InlineFunctionPass> X("inline-function",
+                                          "Inline function obfuscation pass",
+                                          false, false);

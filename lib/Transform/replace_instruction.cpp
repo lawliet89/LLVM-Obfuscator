@@ -31,6 +31,11 @@ static cl::opt<std::string> replaceSeed(
     "replaceSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
+static cl::opt<bool>
+    disableReplaceInst("disableReplaceInst", cl::init(false),
+                       cl::desc("Disable Replace Instruction pass regardless. "
+                                "Useful when used in -OX mode."));
+
 STATISTIC(NumInstReplaced, "Number of instructions replaced");
 STATISTIC(NumUnreachableBlocks, "Number of unreachable basic blocks");
 STATISTIC(NumUnviableBlocks, "Number of unreachable basic blocks with no "
@@ -67,6 +72,9 @@ static unsigned floatCompare[floatCompareSize] = {
 }
 
 bool ReplaceInstruction::runOnBasicBlock(BasicBlock &block) {
+  if (disableReplaceInst)
+    return false;
+
   // Check that block is unreachable
   if (!OpaquePredicate::isBasicBlockUnreachable(block)) {
     return false;

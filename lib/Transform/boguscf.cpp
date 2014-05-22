@@ -60,6 +60,10 @@ static cl::opt<std::string> bcfSeed(
     "bcfSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
+static cl::opt<bool> disableBcf(
+    "disableBcf", cl::init(false),
+    cl::desc("Disable BCF pass regardless. Useful when used in -OX mode."));
+
 STATISTIC(NumBlocksSeen, "Number of basic blocks processed (excluding skips "
                          "due to PHI/terminator only blocks)");
 STATISTIC(NumBlocksSkipped,
@@ -87,6 +91,9 @@ bool BogusCF::doInitialization(Module &M) {
 }
 
 bool BogusCF::runOnFunction(Function &F) {
+  if (disableBcf)
+    return false;
+
   bool hasBeenModified = false;
   // If the function is declared elsewhere in other translation unit
   // we should not modify it here

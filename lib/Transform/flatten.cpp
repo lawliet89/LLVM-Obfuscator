@@ -37,7 +37,7 @@ using namespace llvm;
 
 static cl::list<std::string>
     flattenFunc("flattenFunc", cl::CommaSeparated,
-                cl::desc("Insert Bogus Control Flow only for some functions: "
+                cl::desc("Flatten only some functions: "
                          "flattenFunc=\"func1,func2\""));
 
 static cl::opt<std::string> flattenSeed(
@@ -47,6 +47,10 @@ static cl::opt<std::string> flattenSeed(
 static cl::opt<double>
     flattenProbability("flattenProbability", cl::init(0.5),
                        cl::desc("Probability that a function will be split"));
+
+static cl::opt<bool> disableFlatten(
+    "disableFlatten", cl::init(false),
+    cl::desc("Disable Flatten pass regardless. Useful when used in -OX mode."));
 
 Value *Flatten::findBlock(LLVMContext &context,
                           std::vector<BasicBlock *> &blocks,
@@ -59,6 +63,9 @@ Value *Flatten::findBlock(LLVMContext &context,
 
 // Initialise and check options
 bool Flatten::runOnModule(Module &M) {
+  if (disableFlatten)
+    return false;
+
   if (flattenProbability < 0.f || flattenProbability > 1.f) {
     LLVMContext &ctx = getGlobalContext();
     ctx.emitError("Flatten: Probability must be between 0 and 1");
@@ -300,7 +307,7 @@ bool Flatten::runOnFunction(Function &F) {
         terminator->eraseFromParent();
         BranchInst::Create(jumpBlock, block);
 
-        // Disabled because Invoke edges are not supported in promoting PHI
+// Disabled because Invoke edges are not supported in promoting PHI
 #if 0
         } else if (InvokeInst *invoke = dyn_cast<InvokeInst>(terminator)) {
           // InvokeInst
