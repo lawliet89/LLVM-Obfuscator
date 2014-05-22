@@ -1,9 +1,39 @@
 #!/bin/bash
 set -eu
+# Flags
+# 1 - Default
+# 2 - Trivial
+# 3 - Maximum
+# 4 - BCF Default
+# 5 - BCF 0.5
+# 6 - BCF 1.0
+# 7 - Loop BCF
+# 8 - Flatten Default
+# 9 - Flatten 0.2
+# 10 - Flatten 1.0
 
 OUTPUT=results.txt
-SIZES=(10 50 100 200 500 1000 2500 5000 10000 100000 250000 500000 1000000)
+SIZES=(10 50)
 SORTS=(mergesort quicksort stack-sort)
+
+BCF_FLAG="-mllvm -bogusCFPass -mllvm -opaquePredicatePass\
+    -mllvm -replaceInstructionPass"
+LOOP_FLAG="-mllvm -loopBCFPass -mllvm -opaquePredicatePass\
+    -mllvm -replaceInstructionPass"
+FLATTEN_FLAGS="-mllvm -flattenPass -mllvm -opaquePredicatePass\
+    -mllvm -replaceInstructionPass"
+
+FLAGS=("" \
+    "-mllvm -trivialObfuscation"\
+    "-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0"\
+    "$BCF_FLAG"\
+    "$BCF_FLAG -mllvm -bcfProbability=0.5"\
+    "$BCF_FLAG -mllvm -bcfProbability=1.0"\
+    "$LOOP_FLAG"\
+    "$FLATTEN_FLAGS"\
+    "$FLATTEN_FLAGS -mllvm -flattenProbability=0.2"\
+    "$FLATTEN_FLAGS -mllvm -flattenProbability=1.0"\
+    )
 
 main() {
     if [[ -n "${1+1}" ]]; then
@@ -11,7 +41,8 @@ main() {
     fi
 
     echo "Building..."
-    make -j 4
+    export OBF_FLAGS=""
+    make
 
     echo "Writing results to $OUTPUT"
     echo -n "" > $OUTPUT
@@ -55,7 +86,25 @@ main() {
         echo "" >> $OUTPUT
     done
 
+    for ((i = 0; i < ${#FLAGS[@]}; i++)); do
+        flags="${FLAGS[$i]}"
+        make clean-obf
+        (export OBF_FLAGS="$flags"; make)
+        echo "$flags"
 
+        for sort in ${SORTS[@]}; do
+            echo -n "${sort}-obf" >> $OUTPUT
+            for size in ${SIZES[@]}; do
+                echo -ne "\t" >> $OUTPUT
+                (/usr/bin/time -f "%e" "test/${sort}-obf" "$tempdir/input-$size.txt"\
+                        > "$tempdir/obf-$sort-$size.txt") 2>&1 | tr '\n' ' ' >>  $OUTPUT
+
+                diff "$tempdir/obf-$sort-$size.txt" "$tempdir/$sort-$size.txt"\
+                 > /dev/null || echo -ne " DIFFER" >> $OUTPUT
+            done
+            echo "" >> $OUTPUT
+        done
+    done
 }
 
 main "$@"
