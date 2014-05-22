@@ -17,13 +17,23 @@
 #include "Transform/replace_instruction.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
+
+static cl::opt<bool> noObfSchedule(
+    "noObfSchedule", cl::init(false),
+    cl::desc("Do not schedule Obfuscation passes"));
+
 // Schedue the passes
 // http://homes.cs.washington.edu/~bholt/posts/llvm-quick-tricks.html
 static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
                                 [](const PassManagerBuilder &,
                                    PassManagerBase &PM) {
+
+  if (noObfSchedule) {
+    return;
+  }
 
   // Demote PHIs to memory for ease of analysis
   PM.add(createDemoteRegisterToMemoryPass());
