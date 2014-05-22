@@ -90,7 +90,7 @@ main() {
         flags="${FLAGS[$i]}"
         make clean-obf
         (export OBF_FLAGS="$flags"; make)
-        echo "$flags"
+        echo "$flags" >> $OUTPUT
 
         for sort in ${SORTS[@]}; do
             echo -n "${sort}-obf" >> $OUTPUT
