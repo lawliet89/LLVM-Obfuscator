@@ -1,0 +1,43 @@
+	10	50	100	200	500	1000	2500	5000	10000	100000	250000	500000
+mergesort	0.02 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.45 	21.80 	86.49 
+mergesort-obf	0.02 	0.00 	0.00 	0.00 	0.01 	0.02 	0.09 	0.32 	1.25 	125.17 	776.10 	3102.19 
+quicksort	0.02 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.02 	0.16 	0.47 	0.77 
+quicksort-obf	0.11 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.04 	0.39 	1.04 	2.09 
+stack-sort	0.01 	0.00 	0.00 	0.00 	0.00 	0.01 	0.04 	0.11 	0.44 	40.95 	257.10 	1031.61 
+stack-sort-obf	0.02 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.41 	40.50 	251.84 	1013.87 
+-mllvm -trivialObfuscation
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.50 	21.70 	85.83 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.02 	0.15 	0.37 	0.72 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.04 	0.11 	0.42 	40.84 	256.10 	1026.24 
+-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.14 	0.55 	2.14 	240.98 	1312.90 	5247.31 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.03 	0.30 	0.71 	1.41 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.42 	41.18 	256.36 	1029.06 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.46 	21.87 	86.37 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.02 	0.15 	0.37 	0.75 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.42 	41.05 	255.08 	1023.47 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=0.5
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.49 	21.60 	86.06 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.02 	0.15 	0.36 	0.74 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.04 	0.11 	0.42 	40.99 	256.53 	1026.19 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=1.0
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.45 	21.55 	86.10 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.02 	0.15 	0.37 	0.74 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.42 	41.05 	255.89 	1027.36 
+-mllvm -loopBCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.02 	0.05 	3.42 	21.60 	86.27 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.02 	0.15 	0.37 	0.73 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.42 	41.19 	256.12 	1033.52 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.12 	10.49 	65.98 	262.90 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.02 	0.15 	0.37 	0.74 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.42 	41.54 	260.37 	1040.59 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=0.2
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.02 	0.05 	3.52 	21.96 	87.32 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.03 	0.16 	0.39 	0.74 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.43 	41.51 	259.93 	1031.71 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=1.0
+mergesort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.02 	0.04 	0.12 	10.36 	64.71 	258.61 
+quicksort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.01 	0.03 	0.17 	0.41 	0.83 
+stack-sort-obf	0.00 	0.00 	0.00 	0.00 	0.00 	0.01 	0.03 	0.11 	0.41 	41.17 	256.41 	1026.14 
