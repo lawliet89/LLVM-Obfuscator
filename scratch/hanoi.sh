@@ -62,13 +62,13 @@ main() {
 
     for size in ${SIZES[@]}; do
         echo -ne "\t" >> $OUTPUT
-        (/usr/bin/time -f "%e" "test/hanoi" "$size") 2>&1 | tr '\n' ' ' >>  $OUTPUT
+        (/usr/bin/time -f "%e" "test/hanoi" "$size" > /dev/null) 2>&1 | tr '\n' ' ' >>  $OUTPUT
     done
     echo "" >> $OUTPUT
 
     for size in ${SIZES[@]}; do
         echo -ne "\t" >> $OUTPUT
-        (/usr/bin/time -f "%e" "test/hanoi-obf" "$size") 2>&1 | tr '\n' ' ' >>  $OUTPUT
+        (/usr/bin/time -f "%e" "test/hanoi-obf" "$size" > /dev/null) 2>&1 | tr '\n' ' ' >>  $OUTPUT
     done
     echo "" >> $OUTPUT
 
@@ -79,7 +79,7 @@ main() {
         echo "$flags" >> $OUTPUT
         for size in ${SIZES[@]}; do
             echo -ne "\t" >> $OUTPUT
-            (/usr/bin/time -f "%e" "test/hanoi-obf" "$size") 2>&1 | tr '\n' ' ' >>  $OUTPUT
+            (/usr/bin/time -f "%e" "test/hanoi-obf" "$size" > /dev/null) 2>&1 | tr '\n' ' ' >>  $OUTPUT
         done
         echo "" >> $OUTPUT
     done
