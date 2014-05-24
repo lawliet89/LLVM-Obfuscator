@@ -13,7 +13,7 @@ set -eu
 # 10 - Flatten 1.0
 
 OUTPUT=hanoi.txt
-SIZES=(10 50 100 250 500 1000)
+SIZES=(2 3 4 5 6 7 8 9 10 15)
 
 BCF_FLAG="-mllvm -bogusCFPass -mllvm -opaquePredicatePass\
     -mllvm -replaceInstructionPass"
