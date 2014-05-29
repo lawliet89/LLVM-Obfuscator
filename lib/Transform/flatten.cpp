@@ -62,7 +62,7 @@ Value *Flatten::findBlock(LLVMContext &context,
 }
 
 // Initialise and check options
-bool Flatten::runOnModule(Module &M) {
+bool Flatten::doInitialization(Module &M) {
   if (disableFlatten)
     return false;
 
@@ -81,13 +81,7 @@ bool Flatten::runOnModule(Module &M) {
   trial.param(
       std::bernoulli_distribution::param_type((double)flattenProbability));
 
-  bool hasBeenModified = false;
-
-  for (Function &F : M) {
-    hasBeenModified |= runOnFunction(F);
-  }
-
-  return hasBeenModified;
+  return false;
 }
 
 bool Flatten::runOnFunction(Function &F) {
