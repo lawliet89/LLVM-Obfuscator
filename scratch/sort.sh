@@ -14,7 +14,7 @@ set -eu
 
 OUTPUT=results.txt
 SIZES=(2500 5000 10000 25000 50000 100000 125000 250000 500000)
-SORTS=(mergesort quicksort stack-sort)
+SORTS=(mergesort quicksort)
 
 BCF_FLAG="-mllvm -bogusCFPass -mllvm -opaquePredicatePass\
     -mllvm -replaceInstructionPass"
