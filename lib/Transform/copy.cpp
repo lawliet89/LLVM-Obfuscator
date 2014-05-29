@@ -172,8 +172,8 @@ bool Copy::runOnModule(Module &M) {
         FunctionType::get(F->getFunctionType()->getReturnType(), ArgTypes,
                           F->getFunctionType()->isVarArg());
 
-    Twine cloneName("");
-    DEBUG(cloneName = cloneName.concat(F->getName()));
+    Twine cloneName(M.getModuleIdentifier());
+    DEBUG(cloneName = F->getName());
     Function *clone = Function::Create(FTy, F->getLinkage(), cloneName, &M);
 
     Function::arg_iterator DestI = clone->arg_begin();

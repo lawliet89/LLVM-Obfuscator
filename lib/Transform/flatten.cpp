@@ -36,17 +36,17 @@
 using namespace llvm;
 
 static cl::list<std::string>
-    flattenFunc("flattenFunc", cl::CommaSeparated,
-                cl::desc("Flatten only some functions: "
-                         "flattenFunc=\"func1,func2\""));
+flattenFunc("flattenFunc", cl::CommaSeparated,
+            cl::desc("Flatten only some functions: "
+                     "flattenFunc=\"func1,func2\""));
 
 static cl::opt<std::string> flattenSeed(
     "flattenSeed", cl::init(""),
     cl::desc("Seed for random number generator. Defaults to system time"));
 
 static cl::opt<double>
-    flattenProbability("flattenProbability", cl::init(0.5),
-                       cl::desc("Probability that a function will be split"));
+flattenProbability("flattenProbability", cl::init(0.5),
+                   cl::desc("Probability that a function will be split"));
 
 static cl::opt<bool> disableFlatten(
     "disableFlatten", cl::init(false),
@@ -62,7 +62,7 @@ Value *Flatten::findBlock(LLVMContext &context,
 }
 
 // Initialise and check options
-bool Flatten::runOnModule(Module &M) {
+bool Flatten::doInitialization(Module &M) {
   if (disableFlatten)
     return false;
 
@@ -81,13 +81,7 @@ bool Flatten::runOnModule(Module &M) {
   trial.param(
       std::bernoulli_distribution::param_type((double)flattenProbability));
 
-  bool hasBeenModified = false;
-
-  for (Function &F : M) {
-    hasBeenModified |= runOnFunction(F);
-  }
-
-  return hasBeenModified;
+  return false;
 }
 
 bool Flatten::runOnFunction(Function &F) {
@@ -119,9 +113,7 @@ bool Flatten::runOnFunction(Function &F) {
   DEBUG(errs() << "\tListing and filtering blocks\n");
   // Get original list of blocks
   for (auto &block : F) {
-    DEBUG(if (!block.hasName()) {
-      block.setName(blockPrefix + Twine(i++));
-    });
+    DEBUG(if (!block.hasName()) { block.setName(blockPrefix + Twine(i++)); });
 
     DEBUG(errs() << "\tBlock " << block.getName() << "\n");
     BasicBlock::iterator inst1 = block.begin();
@@ -375,7 +367,7 @@ bool Flatten::runOnFunction(Function &F) {
           for (User *user : users) {
             user->replaceUsesOfWith(&inst, phi);
           }
-          // DemotePHIToStack(phi);
+          DemotePHIToStack(phi);
         }
       }
     }
@@ -383,6 +375,7 @@ bool Flatten::runOnFunction(Function &F) {
 
   entryBuilder.CreateBr(jumpBlock);
 
+#if 0
   // Iterate through PHINodes of jumpBlock and assign NULL values or other
   // necessary incoming
   for (auto &inst : *jumpBlock) {
@@ -403,6 +396,7 @@ bool Flatten::runOnFunction(Function &F) {
       }
     }
   }
+#endif
 
   DEBUG_WITH_TYPE("cfg", F.viewCFG());
   // DEBUG_WITH_TYPE("cfg", F.viewCFG());
