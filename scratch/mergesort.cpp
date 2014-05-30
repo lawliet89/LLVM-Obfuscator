@@ -29,36 +29,7 @@ void mergesort(InputIterator start, InputIterator end, OutputIterator output) {
   mergesort(start + split, end, output + split);
 
   // In place merging
-  // Or... use
-  // inplace_merge (output, output+split, output+size);
-  OutputIterator left = output, right = output + split,
-                 rightEnd = output + size;
-
-  for (; left < right; left++) {
-    if (*right < *left) {
-      // If the right item is bigger than the left then we will move the right
-      // item to the current position in the left
-      // Get the type of the value
-      typename std::iterator_traits<OutputIterator>::value_type
-          value; // See
-                 // http://www.cplusplus.com/reference/std/iterator/iterator_traits/
-      std::swap(value, *left); // Use swap to prevent throwing. Now value has
-                               // the value of left
-      std::swap(*left, *right); // And left has the value of right
-
-      // Now let's insert the former left value into the correct spot on the
-      // right
-      // Since the right is also sorted, we will move all the items on the right
-      // one slot to the left until we get the correct position
-      OutputIterator i = right + 1;
-      while (i != rightEnd && *i < value) {
-        std::swap(*i, *(i - 1));
-        i++;
-      }
-      // When we are here, i-1 will be an empty slot to put value in
-      std::swap(*(i - 1), value);
-    }
-  }
+  inplace_merge (output, output+split, output+size);
 }
 
 int main(int argc, char **argv) {
