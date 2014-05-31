@@ -1,0 +1,21 @@
+	10000	50000	100000	500000	750000	1000000	2000000	5000000	10000000	50000000
+mergesort	0.01 	0.03 	0.04 	0.21 	0.31 	0.41 	0.81 	2.04 	4.36 	20.07 
+mergesort-obf	0.01 	0.03 	0.07 	0.37 	0.53 	0.72 	1.48 	3.82 	7.73 	38.28 
+-mllvm -trivialObfuscation
+mergesort-obf	0.01 	0.03 	0.05 	0.21 	0.30 	0.51 	0.83 	2.04 	4.16 	19.71 
+-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0
+mergesort-obf	0.06 	0.16 	0.35 	1.86 	2.76 	3.97 	7.90 	20.77 	42.44 	227.99 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.01 	0.03 	0.05 	0.21 	0.31 	0.41 	0.82 	2.12 	4.31 	20.32 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=0.5
+mergesort-obf	0.01 	0.03 	0.05 	0.21 	0.32 	0.42 	0.84 	2.09 	4.21 	20.44 
+-mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=1.0
+mergesort-obf	0.01 	0.03 	0.05 	0.21 	0.30 	0.40 	0.82 	2.03 	4.12 	20.26 
+-mllvm -loopBCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.01 	0.03 	0.05 	0.32 	0.43 	0.41 	0.85 	2.12 	4.25 	20.58 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
+mergesort-obf	0.01 	0.03 	0.05 	0.22 	0.31 	0.42 	0.93 	2.18 	4.22 	20.28 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=0.2
+mergesort-obf	0.01 	0.03 	0.05 	0.21 	0.32 	0.42 	0.84 	2.11 	4.32 	20.56 
+-mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=1.0
+mergesort-obf	0.29 	0.04 	0.08 	0.35 	0.54 	0.73 	1.49 	3.69 	7.65 	38.41 
