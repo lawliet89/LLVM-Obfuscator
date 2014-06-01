@@ -10,7 +10,8 @@ all: test/get_input.o test/get_input_obf.o test/generator test/stack-sort\
 	test/stack-sort-obf test/hanoi test/hanoi-obf\
 	test/mergesort test/mergesort-obf\
 	test/radixsort test/radixsort-obf\
-	test/quicksort test/quicksort-obf
+	test/quicksort test/quicksort-obf\
+	test/bubblesort test/bubblesort-obf
 
 clean-obf:
 	rm test/*-obf
@@ -55,6 +56,13 @@ test/quicksort: quicksort.cpp test/get_input.o
 test/quicksort-obf: quicksort.cpp test/get_input_obf.o
 	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
 		-o test/quicksort-obf quicksort.cpp test/get_input_obf.o
+test/bubblesort: bubblesort.cpp test/get_input.o
+	$(CPP) $(CPP_FLAGS) -o test/bubblesort bubblesort.cpp test/get_input.o
+
+test/bubblesort-obf: bubblesort.cpp test/get_input_obf.o
+	$(OBF_BUILD) $(CPP_FLAGS) $(OBF_FLAGS) \
+		-o test/bubblesort-obf bubblesort.cpp test/get_input_obf.o
+
 
 test/generator: generator.cpp
 	$(CPP) $(CPP_FLAGS) -o test/generator generator.cpp
