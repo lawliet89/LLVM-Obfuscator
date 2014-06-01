@@ -1,21 +1,21 @@
 	1000	2000	3000	4000	5000	7500	10000	25000	50000	100000	200000
-bubblesort	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.12 	0.90 	3.77 	15.46 	62.38 
-bubblesort-obf	0.00 	0.01 	0.01 	0.03 	0.03 	0.07 	0.13 	0.91 	3.77 	15.44 	62.27 
+bubblesort	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.91 	3.73 	15.52 	62.40 
+bubblesort-obf	0.00 	0.00 	0.01 	0.02 	0.03 	0.07 	0.13 	0.95 	3.76 	15.48 	62.58 
 -mllvm -trivialObfuscation
-bubblesort-obf	0.00 	0.01 	0.02 	0.03 	0.03 	0.07 	0.13 	0.90 	3.74 	15.47 	62.44 
+bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.90 	3.84 	15.54 	62.48 
 -mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.14 	0.90 	3.73 	15.46 	62.26 
+bubblesort-obf	0.07 	0.23 	0.50 	0.89 	1.37 	3.04 	5.48 	34.58 	138.24 	555.99 	2221.42 
 -mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.90 	3.74 	15.44 	62.60 
+bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.92 	3.77 	15.64 	62.54 
 -mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=0.5
-bubblesort-obf	0.00 	0.00 	0.01 	0.01 	0.02 	0.06 	0.13 	0.92 	3.87 	16.01 	62.76 
+bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.92 	4.02 	15.66 	62.50 
 -mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -bcfProbability=1.0
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.90 	3.72 	15.54 	62.50 
+bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.91 	3.75 	15.59 	62.34 
 -mllvm -loopBCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.91 	3.76 	15.52 	62.60 
+bubblesort-obf	0.00 	0.01 	0.01 	0.03 	0.03 	0.07 	0.13 	0.92 	3.89 	15.62 	62.56 
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.90 	3.81 	15.43 	62.40 
+bubblesort-obf	0.01 	0.03 	0.06 	0.10 	0.15 	0.31 	0.54 	3.40 	13.30 	53.47 	214.61 
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=0.2
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.92 	3.72 	15.48 	62.37 
+bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.90 	3.75 	15.53 	62.37 
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=1.0
-bubblesort-obf	0.00 	0.01 	0.02 	0.02 	0.03 	0.07 	0.13 	0.91 	3.73 	15.43 	62.49 
+bubblesort-obf	0.01 	0.03 	0.06 	0.09 	0.15 	0.31 	0.53 	3.39 	13.42 	53.49 	213.94 
