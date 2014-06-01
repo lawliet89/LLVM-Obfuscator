@@ -1,6 +1,3 @@
-// Quicksort - see makefile for compiling options with G++.
-// Will not compile in VS2012 due to initialiser syntax in main() for
-// std::vector
 #include <cstdio> // Using this to not use std::cout and prevent throws
 #include <vector>
 #include <algorithm> // Required
@@ -9,11 +6,6 @@
 #include <time.h>    // Required
 #include "get_input.h"
 
-// Function Prototypes
-int randomNumber(int start, int end); // Generate a number between start and end
-
-// Perform QuickSort
-// Data provided will be modified
 template <typename Iterator> void bubblesort(Iterator start, Iterator end) {
   int size = (end - start);
   if (size <= 0)
