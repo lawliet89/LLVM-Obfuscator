@@ -77,7 +77,8 @@ bool Metrics::runOnModule(Module &M) {
       }
     }
 
-    nesting += calculateNest(F.getEntryBlock(), loopInfo);
+    unsigned nestCalc = calculateNest(F.getEntryBlock(), loopInfo);
+    nesting += nestCalc == 0 ? 0 : nestCalc - 1;
     cyclomatic += 2;
   }
 
