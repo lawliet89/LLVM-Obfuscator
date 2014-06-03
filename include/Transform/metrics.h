@@ -10,6 +10,7 @@
 #define METRICS_H
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
+#include "llvm/Analysis/LoopInfo.h"
 using namespace llvm;
 
 struct Metrics : public ModulePass {
@@ -20,6 +21,7 @@ struct Metrics : public ModulePass {
 
   virtual void getAnalysisUsage(AnalysisUsage &Info) const {
     Info.setPreservesAll();
+    Info.addRequired<LoopInfo>();
   }
 };
 
