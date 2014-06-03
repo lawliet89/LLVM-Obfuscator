@@ -102,7 +102,7 @@ bool Metrics::runOnModule(Module &M) {
 }
 
 unsigned Metrics::calculateNest(BasicBlock &BB, LoopInfo &loopInfo) {
-  if (Loop *loop = loopInfo.getLoopFor(&BB)) {
+  if (loopInfo.getLoopFor(&BB)) {
     // In a loop -- skipping
     return 0;
   }
@@ -114,7 +114,7 @@ unsigned Metrics::calculateNest(BasicBlock &BB, LoopInfo &loopInfo) {
     if (branch->isConditional()) {
       isConditional = true;
     }
-  } else if (SwitchInst *switchInst = dyn_cast<SwitchInst>(terminator)) {
+  } else if (isa<SwitchInst>(terminator)) {
     isConditional = true;
   } else if (isa<ReturnInst>(terminator)) {
     isConditional = true;

@@ -24,7 +24,7 @@ FLATTEN_FLAGS="-mllvm -flattenPass -mllvm -opaquePredicatePass\
 
 FLAGS=(\
     "-mllvm -trivialObfuscation"\
-    "-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0"\
+    "-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0 -mllvm -inlineProbability=1.0"\
     "$BCF_FLAG"\
     "$BCF_FLAG -mllvm -bcfProbability=0.5"\
     "$BCF_FLAG -mllvm -bcfProbability=1.0"\
