@@ -23,6 +23,8 @@ struct Metrics : public ModulePass {
     Info.setPreservesAll();
     Info.addRequired<LoopInfo>();
   }
-};
 
+private:
+  unsigned calculateNest(BasicBlock &BB, LoopInfo &loopInfo);
+};
 #endif

@@ -42,10 +42,15 @@ bool Metrics::runOnModule(Module &M) {
   unsigned long nesting = 0;
 
   for (auto &F : M) {
-    for (auto &BB : F) {
-      LoopInfo &loopInfo = getAnalysis<LoopInfo>(F);
-      std::vector<Loop *> loops;
+    if (F.isDeclaration()) {
+      continue;
+    }
 
+    LoopInfo &loopInfo = getAnalysis<LoopInfo>(F);
+
+    for (auto &BB : F) {
+
+      std::vector<Loop *> loops;
       for (auto &inst : BB) {
         ++programLength;
         programLength += inst.getNumOperands();
@@ -54,8 +59,9 @@ bool Metrics::runOnModule(Module &M) {
       TerminatorInst *terminator = BB.getTerminator();
 
       if (BranchInst *branch = dyn_cast<BranchInst>(terminator)) {
-        if (branch->isConditional())
+        if (branch->isConditional()) {
           ++cyclomatic;
+        }
       } else if (SwitchInst *switchInst = dyn_cast<SwitchInst>(terminator)) {
         cyclomatic += switchInst->getNumCases();
       } else if (isa<ReturnInst>(terminator)) {
@@ -66,10 +72,12 @@ bool Metrics::runOnModule(Module &M) {
         if (std::find(loops.begin(), loops.end(), loop) == loops.end()) {
           loops.push_back(loop);
           ++cyclomatic;
+          nesting += loop->getLoopDepth();
         }
       }
     }
 
+    nesting += calculateNest(F.getEntryBlock(), loopInfo);
     cyclomatic += 2;
   }
 
@@ -90,6 +98,36 @@ bool Metrics::runOnModule(Module &M) {
     errs() << format(metricsFormat.c_str(), programLength, cyclomatic, nesting);
   }
   return false;
+}
+
+unsigned Metrics::calculateNest(BasicBlock &BB, LoopInfo &loopInfo) {
+  if (Loop *loop = loopInfo.getLoopFor(&BB)) {
+    // In a loop -- skipping
+    return 0;
+  }
+
+  bool isConditional = false;
+  TerminatorInst *terminator = BB.getTerminator();
+
+  if (BranchInst *branch = dyn_cast<BranchInst>(terminator)) {
+    if (branch->isConditional()) {
+      isConditional = true;
+    }
+  } else if (SwitchInst *switchInst = dyn_cast<SwitchInst>(terminator)) {
+    isConditional = true;
+  } else if (isa<ReturnInst>(terminator)) {
+    isConditional = true;
+  }
+
+  unsigned nest = isConditional ? 1 : 0;
+
+  for (unsigned i = 0, successors = terminator->getNumSuccessors();
+       i < successors; ++i) {
+    nest =
+        std::max(nest, calculateNest(*(terminator->getSuccessor(i)), loopInfo));
+  }
+
+  return nest;
 }
 
 static RegisterPass<Metrics> X("metrics", "Potency analysis metrics pass",
