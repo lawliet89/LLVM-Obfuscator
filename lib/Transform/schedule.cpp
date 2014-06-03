@@ -14,6 +14,7 @@
 #include "Transform/inline_function.h"
 #include "Transform/loop_boguscf.h"
 #include "Transform/opaque_predicate.h"
+#include "Transform/metrics.h"
 #include "Transform/replace_instruction.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -30,6 +31,10 @@ static cl::opt<bool> trivialObfuscation(
     "trivialObfuscation", cl::init(false),
     cl::desc(
         "Only scheudle trivial obfuscation passes that do not modify the CFG"));
+
+static cl::opt<bool>
+    scheduleMetrics("schedule-metrics", cl::init(false),
+                  cl::desc("Schedule Metrics Passes"));
 
 enum ScheduleOptions {
   copyPass,
@@ -163,7 +168,15 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_OptimizerLast,
 
   std::vector<Pass *> passes = getPasses();
 
+  if (scheduleMetrics) {
+    PM.add(new Metrics());
+  }
+
   for (Pass *pass : passes) {
     PM.add(pass);
+  }
+
+  if (scheduleMetrics) {
+    PM.add(new Metrics());
   }
 });
