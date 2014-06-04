@@ -21,6 +21,8 @@ LOOP_FLAG="-mllvm -loopBCFPass -mllvm -opaquePredicatePass\
     -mllvm -replaceInstructionPass"
 FLATTEN_FLAGS="-mllvm -flattenPass -mllvm -opaquePredicatePass\
     -mllvm -replaceInstructionPass"
+INLINE_FLAGS="-mllvm -inlineFunctionPass"
+COPY_FLAGS="-mllvm -copyPass"
 
 FLAGS=(\
     "-mllvm -trivialObfuscation"\
@@ -32,6 +34,10 @@ FLAGS=(\
     "$FLATTEN_FLAGS"\
     "$FLATTEN_FLAGS -mllvm -flattenProbability=0.2"\
     "$FLATTEN_FLAGS -mllvm -flattenProbability=1.0"\
+    "$INLINE_FLAGS"\
+    "$INLINE_FLAGS -mllvm -inlineProbability=0.5"\
+    "$COPY_FLAGS"\
+    "$COPY_FLAGS -mllvm -copyProbability=1.0"
     )
 
 main() {
