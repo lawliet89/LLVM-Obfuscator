@@ -72,7 +72,7 @@ bool Metrics::runOnModule(Module &M) {
         if (std::find(loops.begin(), loops.end(), loop) == loops.end()) {
           loops.push_back(loop);
           ++cyclomatic;
-          nesting += loop->getLoopDepth();
+          nesting += loop->getLoopDepth() - 1;
         }
       }
     }
