@@ -116,8 +116,6 @@ unsigned Metrics::calculateNest(BasicBlock &BB, LoopInfo &loopInfo) {
     }
   } else if (isa<SwitchInst>(terminator)) {
     isConditional = true;
-  } else if (isa<ReturnInst>(terminator)) {
-    isConditional = true;
   }
 
   unsigned nest = isConditional ? 1 : 0;
