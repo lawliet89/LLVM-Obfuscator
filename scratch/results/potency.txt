@@ -1,13 +1,18 @@
+
+mergesort,2084,179,208,7131,409,577
+hanoi,2474,129,131,5891,270,278
+quicksort,320,33,36,392,34,38
+bubblesort,160,17,19,1462,41,41
 -mllvm -trivialObfuscation
-mergesort,2084,179,208,11684,1078,1662
-hanoi,2474,129,131,3998,200,219
-quicksort,320,33,36,481,46,52
+mergesort,2084,179,208,5493,480,619
+hanoi,2474,129,131,3317,168,175
+quicksort,320,33,36,481,47,60
 bubblesort,160,17,19,160,17,19
 -mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0
-mergesort,2084,179,208,728088,2925,2925
-hanoi,2474,129,131,17813,416,422
-quicksort,320,33,36,5566,158,171
-bubblesort,160,17,19,3124,72,72
+mergesort,2084,179,208,779561,3363,3363
+hanoi,2474,129,131,50326,708,716
+quicksort,320,33,36,5198,131,131
+bubblesort,160,17,19,3129,72,72
 -mllvm -bogusCFPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
 mergesort,2084,179,208,2098,179,208
 hanoi,2474,129,131,2488,129,131
@@ -29,14 +34,14 @@ hanoi,2474,129,131,2554,129,131
 quicksort,320,33,36,328,33,36
 bubblesort,160,17,19,168,17,19
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass
-mergesort,2084,179,208,6677,192,206
-hanoi,2474,129,131,2806,141,143
+mergesort,2084,179,208,15628,208,208
+hanoi,2474,129,131,2776,138,140
 quicksort,320,33,36,749,38,38
-bubblesort,160,17,19,162,17,19
+bubblesort,160,17,19,597,24,24
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=0.2
 mergesort,2084,179,208,2098,179,208
 hanoi,2474,129,131,2488,129,131
-quicksort,320,33,36,328,33,36
+quicksort,320,33,36,749,38,38
 bubblesort,160,17,19,162,17,19
 -mllvm -flattenPass -mllvm -opaquePredicatePass    -mllvm -replaceInstructionPass -mllvm -flattenProbability=1.0
 mergesort,2084,179,208,15628,208,208
@@ -44,19 +49,19 @@ hanoi,2474,129,131,3094,150,152
 quicksort,320,33,36,749,38,38
 bubblesort,160,17,19,597,24,24
 -mllvm -inlineFunctionPass
-mergesort,2084,179,208,2884,233,283
-hanoi,2474,129,131,2847,144,147
+mergesort,2084,179,208,3432,283,354
+hanoi,2474,129,131,2522,133,136
 quicksort,320,33,36,489,46,52
 bubblesort,160,17,19,162,17,19
 -mllvm -inlineFunctionPass -mllvm -inlineProbability=0.5
-mergesort,2084,179,208,7508,730,1224
-hanoi,2474,129,131,4216,211,232
-quicksort,320,33,36,650,60,76
+mergesort,2084,179,208,7844,723,1057
+hanoi,2474,129,131,3031,150,156
+quicksort,320,33,36,489,47,60
 bubblesort,160,17,19,162,17,19
 -mllvm -copyPass
-mergesort,2084,179,208,2936,261,304
-hanoi,2474,129,131,2806,138,140
-quicksort,320,33,36,328,33,36
+mergesort,2084,179,208,3765,326,384
+hanoi,2474,129,131,2488,129,131
+quicksort,320,33,36,496,49,55
 bubblesort,160,17,19,162,17,19
 -mllvm -copyPass -mllvm -copyProbability=1.0
 mergesort,2084,179,208,3935,340,398

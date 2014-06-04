@@ -25,6 +25,7 @@ INLINE_FLAGS="-mllvm -inlineFunctionPass"
 COPY_FLAGS="-mllvm -copyPass"
 
 FLAGS=(\
+    ""\
     "-mllvm -trivialObfuscation"\
     "-mllvm -flattenProbability=1.0 -mllvm -copyProbability=1.0 -mllvm -bcfProbability=1.0"\
     "$BCF_FLAG"\
