@@ -86,9 +86,13 @@ bool InlineFunctionPass::runOnFunction(Function &F) {
     for (auto &block : F) {
       for (auto &inst : block) {
         if (InvokeInst *invoke = dyn_cast<InvokeInst>(&inst)) {
+          if (invoke->getCalledFunction()->isIntrinsic())
+            continue;
           DEBUG(errs() << "\t\t\t" << inst << "\n");
           callsites.push_back(CallSite(invoke));
         } else if (CallInst *call = dyn_cast<CallInst>(&inst)) {
+          if (call->getCalledFunction()->isIntrinsic())
+            continue;
           DEBUG(errs() << "\t\t\t" << inst << "\n");
           callsites.push_back(CallSite(call));
         }
