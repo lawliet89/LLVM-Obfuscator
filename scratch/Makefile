@@ -2,7 +2,7 @@ OBF_BUILD = ./obf.sh
 BUILD_DIR = build
 
 CPP = $(BUILD_DIR)/Release+Asserts/bin/clang++
-CPP_FLAGS = -O3 -Wall -std=c++11
+CPP_FLAGS ?= -O3 -Wall -std=c++11
 
 OBF_FLAGS ?=
 
@@ -14,7 +14,7 @@ all: test/get_input.o test/get_input_obf.o test/generator test/stack-sort\
 	test/bubblesort test/bubblesort-obf
 
 clean-obf:
-	rm test/*-obf
+	rm -f test/*-obf
 
 test/get_input.o: get_input.cpp get_input.h
 	$(CPP) $(CPP_FLAGS) -c -o test/get_input.o get_input.cpp
