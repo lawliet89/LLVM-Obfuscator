@@ -38,7 +38,8 @@ FLAGS=(\
     "$INLINE_FLAGS"\
     "$INLINE_FLAGS -mllvm -inlineProbability=0.5"\
     "$COPY_FLAGS"\
-    "$COPY_FLAGS -mllvm -copyProbability=1.0"
+    "$COPY_FLAGS -mllvm -copyProbability=1.0"\
+    "-mllvm -identifierRenamerPass"\
     )
 
 main() {
