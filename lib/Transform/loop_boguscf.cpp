@@ -60,7 +60,7 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
   }
 
   ++NumLoopsObf;
-  DEBUG(header->getParent()->viewCFG());
+  // DEBUG(header->getParent()->viewCFG());
 
   DEBUG(errs() << "\tCreating dummy block\n");
   LoopInfo &info = getAnalysis<LoopInfo>();
@@ -84,7 +84,7 @@ bool LoopBogusCF::runOnLoop(Loop *loop, LPPassManager &LPM) {
   OpaquePredicate::createStub(dummy, trueBlock, falseBlock,
                               OpaquePredicate::PredicateTrue, false);
 
-  DEBUG(header->getParent()->viewCFG());
+  // DEBUG(header->getParent()->viewCFG());
 
   return true;
 }

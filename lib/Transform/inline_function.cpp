@@ -105,7 +105,7 @@ bool InlineFunctionPass::runOnFunction(Function &F) {
 
     for (CallSite callsite : callsites) {
       DEBUG(errs() << "\t\t" << *(callsite.getInstruction()) << "\n");
-      if (!trial(engine)) {
+      if (inlineProbability != 1 && !trial(engine)) {
         DEBUG(errs() << "\t\t\tSkipping: Bernoulli trial failed\n");
         continue;
       }

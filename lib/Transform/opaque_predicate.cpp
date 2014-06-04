@@ -136,7 +136,7 @@ bool OpaquePredicate::runOnModule(Module &M) {
           llvm_unreachable("Unsupported predicate type");
         }
       }
-      DEBUG_WITH_TYPE("opaque_cfg", function.viewCFG());
+      // DEBUG_WITH_TYPE("opaque_cfg", function.viewCFG());
     }
   }
   return true;

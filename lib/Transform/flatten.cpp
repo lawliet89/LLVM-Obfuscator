@@ -172,7 +172,7 @@ bool Flatten::runOnFunction(Function &F) {
     return false;
   }
 
-  DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   // Demote all the PHI Nodes to stack
   DEBUG(errs() << "\tDemoting PHI Nodes to stack\n");
@@ -398,7 +398,7 @@ bool Flatten::runOnFunction(Function &F) {
   }
 #endif
 
-  DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  // DEBUG_WITH_TYPE("cfg", F.viewCFG());
   // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   ObfUtils::tagFunction(F, ObfUtils::FlattenObf);

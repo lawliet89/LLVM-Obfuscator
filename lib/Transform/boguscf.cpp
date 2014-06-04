@@ -190,7 +190,7 @@ bool BogusCF::runOnFunction(Function &F) {
     DemotePHIToStack(phi);
   }
 
-  DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  // DEBUG_WITH_TYPE("cfg", F.viewCFG());
 
   trial.reset(); // Independent per function
   DEBUG(errs() << "\tRandomly shuffling list of basic blocks\n");
@@ -399,7 +399,7 @@ bool BogusCF::runOnFunction(Function &F) {
     OpaquePredicate::createStub(block, originalBlock, copyBlock);
     hasBeenModified |= true;
   }
-  DEBUG_WITH_TYPE("cfg", F.viewCFG());
+  // DEBUG_WITH_TYPE("cfg", F.viewCFG());
   if (hasBeenModified)
     ObfUtils::tagFunction(F, ObfUtils::BogusCFObf);
   return hasBeenModified;
