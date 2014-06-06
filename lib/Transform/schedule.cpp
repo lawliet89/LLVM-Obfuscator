@@ -36,6 +36,10 @@ static cl::opt<bool>
     scheduleMetrics("schedule-metrics", cl::init(false),
                   cl::desc("Schedule Metrics Passes"));
 
+static cl::opt<bool>
+    scheduleStub("schedule-stub", cl::init(false),
+                  cl::desc("Does not do anything."));
+
 enum ScheduleOptions {
   copyPass,
   inlineFunctionPass,

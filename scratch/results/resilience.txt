@@ -1,0 +1,79 @@
+mergesort
+hanoi
+quicksort
+bubblesort
+-schedule-stub
+mergesort,2082,179,208,23304,355,388,22464,355,388
+hanoi,2449,129,131,5448,228,234,4843,222,228
+quicksort,318,33,36,899,68,85,881,68,85
+bubblesort,177,17,19,1556,41,41,1572,41,41
+-trivialObfuscation
+mergesort,2082,179,208,5873,511,643,5703,512,644
+hanoi,2449,129,131,3685,195,200,3283,182,187
+quicksort,318,33,36,479,47,60,471,47,60
+bubblesort,177,17,19,177,17,19,177,17,19
+-flattenProbability=1.0 -copyProbability=1.0 -bcfProbability=1.0
+mergesort,2082,179,208,462217,2663,2663,277006,1850,1850
+hanoi,2449,129,131,16685,442,448,13452,397,403
+quicksort,318,33,36,5210,131,131,5143,131,131
+bubblesort,177,17,19,4049,80,80,3883,80,80
+-bogusCFPass -opaquePredicatePass    -replaceInstructionPass
+mergesort,2082,179,208,2096,179,208,2018,179,208
+hanoi,2449,129,131,2463,129,131,2449,129,131
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
+-bogusCFPass -opaquePredicatePass    -replaceInstructionPass -bcfProbability=0.5
+mergesort,2082,179,208,2096,179,208,2018,179,208
+hanoi,2449,129,131,2463,129,131,2449,129,131
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
+-bogusCFPass -opaquePredicatePass    -replaceInstructionPass -bcfProbability=1.0
+mergesort,2082,179,208,2096,179,208,2018,179,208
+hanoi,2449,129,131,2463,129,131,2449,129,131
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
+-loopBCFPass -opaquePredicatePass    -replaceInstructionPass
+mergesort,2082,179,208,2126,179,208,2018,179,208
+hanoi,2449,129,131,2529,129,131,2449,129,131
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,185,17,19,177,17,19
+-flattenPass -opaquePredicatePass    -replaceInstructionPass
+mergesort,2082,179,208,11047,195,210,10752,195,210
+hanoi,2449,129,131,2852,144,146,2726,144,146
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,765,25,25,713,25,25
+-flattenPass -opaquePredicatePass    -replaceInstructionPass -flattenProbability=0.2
+mergesort,2082,179,208,3062,178,195,2960,178,195
+hanoi,2449,129,131,2677,135,137,2609,135,137
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
+-flattenPass -opaquePredicatePass    -replaceInstructionPass -flattenProbability=1.0
+mergesort,2082,179,208,15626,208,208,15034,208,208
+hanoi,2449,129,131,3066,150,152,2886,150,152
+quicksort,318,33,36,747,38,38,737,38,38
+bubblesort,177,17,19,765,25,25,713,25,25
+-inlineFunctionPass
+mergesort,2082,179,208,5328,480,677,5168,482,680
+hanoi,2449,129,131,2763,146,148,2708,146,148
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
+-inlineFunctionPass -inlineProbability=0.5
+mergesort,2082,179,208,10032,922,1699,9731,928,1712
+hanoi,2449,129,131,3639,184,189,3278,180,185
+quicksort,318,33,36,487,47,60,471,47,60
+bubblesort,177,17,19,179,17,19,177,17,19
+-copyPass
+mergesort,2082,179,208,2775,227,259,2705,224,256
+hanoi,2449,129,131,3124,153,155,3137,157,160
+quicksort,318,33,36,494,49,55,484,49,55
+bubblesort,177,17,19,179,17,19,177,17,19
+-copyPass -copyProbability=1.0
+mergesort,2082,179,208,3933,340,398,3788,336,394
+hanoi,2449,129,131,3124,153,155,3137,157,160
+quicksort,318,33,36,494,49,55,484,49,55
+bubblesort,177,17,19,179,17,19,177,17,19
+-identifierRenamerPass
+mergesort,2082,179,208,2096,179,208,2018,179,208
+hanoi,2449,129,131,2463,129,131,2449,129,131
+quicksort,318,33,36,326,33,36,318,33,36
+bubblesort,177,17,19,179,17,19,177,17,19
