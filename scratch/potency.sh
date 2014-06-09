@@ -40,6 +40,9 @@ FLAGS=(\
     "$COPY_FLAGS"\
     "$COPY_FLAGS -mllvm -copyProbability=1.0"\
     "-mllvm -identifierRenamerPass"\
+    "$BCF_FLAG $FLATTEN_FLAGS"\
+    "$INLINE_FLAGS $FLATTEN_FLAGS"\
+    "$COPY_FLAGS $FLATTEN_FLAGS"
     )
 
 main() {
